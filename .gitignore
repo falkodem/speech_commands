@@ -1,2 +1,6 @@
 gitignore
-./idea/
+idea/
+venv/
+data/
+SpeechCommands/
+utils/
