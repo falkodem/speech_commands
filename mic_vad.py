@@ -39,7 +39,7 @@ args = parser.parse_args(remaining)
 
 #   ------set some parameters ------
 # blocks in ms, fs in Hz
-block_len_ms = 64
+block_len_ms = 32
 block_shift_ms = 8
 fs_target = 16000
 # create the interpreters
@@ -74,12 +74,12 @@ audio_is_processed = False
 thrsh = 0.5
 num_of_parts = block_len_ms//block_shift_ms
 current_part = 0
-denoised_audio = np.zeros()
+# denoised_audio = np.zeros()
 
 def callback(indata, frames, time, status):
     # buffer and states to global
     global in_buffer, out_buffer, states_1, states_2
-    global denoised_audio, audio_is_processed, current_part
+    global denoised_speech, audio_is_processed, current_part
 
     if status:
         print(status)
@@ -119,30 +119,29 @@ def callback(indata, frames, time, status):
     out_buffer[:-block_shift] = out_buffer[block_shift:]
     out_buffer[-block_shift:] = np.zeros((block_shift))
     out_buffer += np.squeeze(out_block)
-    # accumulate audio fragment
-    ##### outdata[:] = np.expand_dims(out_buffer[:block_shift], axis=-1)
-    denoised_audio[] = out_buffer[:block_shift]
 
-    # flag for word ending
-    audio_is_processed = True
-    # elif audio_is_processed == True:
-    do_smth(denoised_audio)
-    denoised_audio = []
-    audio_is_processed = False
+    # accumulate audio fragment
+    # outdata[:] = np.expand_dims(out_buffer[:block_shift], axis=-1)
+    # denoised_audio[] = out_buffer[:block_shift]
 
     # ---------------VAD---------------
     if current_part == num_of_parts-1:
-        indata_tnsr = torch.FloatTensor(indata).squeeze()
-        speech_prob = vad_model(indata_tnsr, 16000).item()
-
+        vad_inpdata_tnsr = torch.FloatTensor(out_buffer).squeeze()
+        speech_prob = vad_model(vad_inpdata_tnsr, 16000).item()
         if speech_prob > thrsh:
+            audio_is_processed = True
+            denoised_speech.extend(out_buffer)
+            print(len(denoised_speech))
+        elif audio_is_processed == True:
+            audio_is_processed = False
+            ##### do_smth(denoised_audio)#######
 
 
 
 try:
     with sd.InputStream(device=args.input_device,
                    samplerate=fs_target, blocksize=block_shift,
-                   dtype=np.float32, latency=0.5, #latency=args.latency,
+                   dtype=np.float32, latency=args.latency,
                    channels=1, callback=callback):
 
         print('#' * 80)

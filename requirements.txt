@@ -1,6 +1,9 @@
-deepspeech~=0.9.3
-sounddevice?=0.4.4
-webrtcvad~=2.0.10
+#deepspeech~=0.9.3
+sounddevice==0.4.4
+#webrtcvad~=2.0.10
 halo~=0.0.18
 numpy>=1.15.1
 scipy>=1.1.0
+tflite-runtime==2.7.0
+torch==1.10.2+cpu
+torchaudio==0.10.2.+cpu
