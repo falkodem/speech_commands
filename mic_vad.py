@@ -66,7 +66,7 @@ block_shift = int(np.round(fs_target * (block_shift_ms / 1000)))
 block_len = int(np.round(fs_target * (block_len_ms / 1000)))
 # create buffer both for vad and noise suppression models
 in_buffer = np.zeros(block_len).astype('float32')
-out_buffer = np.zeros(block_len*num_parts).astype('float32')
+out_buffer = np.zeros(block_len).astype('float32')
 
 # load vad model
 vad_model = init_jit_model('models/silero_vad.jit')
@@ -81,13 +81,13 @@ thrsh = 0.1
 num_of_parts = block_len_ms//block_shift_ms
 current_part = 0
 denoised_speech = []
-
+denoised_audio = out_buffer.copy()
 i=0
 
 def callback(indata, frames, time, status):
     # buffer and states to global
     global in_buffer, out_buffer, states_1, states_2
-    global denoised_speech, audio_is_processed, current_part,i
+    global denoised_speech,denoised_audio, audio_is_processed, current_part,i
 
     if status:
         print(status)
@@ -125,19 +125,24 @@ def callback(indata, frames, time, status):
     states_2 = interpreter_2.get_tensor(output_details_2[1]['index'])
     # write to buffer
     out_buffer[:-block_shift] = out_buffer[block_shift:]
-    out_buffer[-block_shift:] = np.zeros((block_shift))
+    out_buffer[-block_shift:] = np.zeros(block_shift)
     out_buffer[-block_len:] = out_buffer[-block_len:] + np.squeeze(out_block)
 
+    denoised_audio[:-block_shift] = denoised_audio[block_shift:]
+    denoised_audio[-block_shift:] = np.zeros(block_shift)
+    denoised_audio[-block_shift:] = out_buffer[:block_shift]
+
     # ---------------VAD---------------
+    # Добавить экспоненциальное сглаживание вероятности речи, чтобы резко не обрывалось и не было провалов
     if current_part == num_of_parts-1:
-        current_part = 0
-        vad_inpdata_tnsr = torch.FloatTensor(out_block).squeeze()
-        speech_prob = vad_model(vad_inpdata_tnsr, fs_target).item()
-        print(i)
+        current_part = -1
+        vad_indata_tnsr = torch.FloatTensor(denoised_audio).squeeze()
+        speech_prob = vad_model(vad_indata_tnsr, fs_target).item()
+        print(speech_prob)
         i+=1
         if speech_prob > thrsh:
             audio_is_processed = True
-            denoised_speech.extend(out_buffer)
+            denoised_speech.extend(denoised_audio)
         elif audio_is_processed == True:
             audio_is_processed = False
             do_smth(denoised_speech)
@@ -149,7 +154,7 @@ def callback(indata, frames, time, status):
 try:
     with sd.InputStream(device=args.input_device,
                    samplerate=fs_target, blocksize=block_shift,
-                   dtype=np.float32, latency=0.5,#latency=args.latency,
+                   dtype=np.float32, latency=0.5,
                    channels=1, callback=callback):
 
         print('#' * 80)
