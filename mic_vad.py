@@ -4,17 +4,8 @@ import argparse
 import torch
 import tflite_runtime.interpreter as tflite
 import torchaudio.backend.soundfile_backend
-
-from VAD.vad_functions import init_jit_model
-
-
-
-def int_or_str(text):
-    """Helper function for argument parsing."""
-    try:
-        return int(text)
-    except ValueError:
-        return text
+from utils.vad_functions import init_jit_model
+from utils.utils import *
 
 
 parser = argparse.ArgumentParser(add_help=False)
@@ -46,11 +37,10 @@ args = parser.parse_args(remaining)
 block_len_ms = 32
 block_shift_ms = 8
 num_parts = block_len_ms//block_shift_ms
-fs_target = 16000
 # create the interpreters
-interpreter_1 = tflite.Interpreter(model_path='./models/model_1.tflite')
+interpreter_1 = tflite.Interpreter(model_path=DTLN_1_PATH)
 interpreter_1.allocate_tensors()
-interpreter_2 = tflite.Interpreter(model_path='./models/model_2.tflite')
+interpreter_2 = tflite.Interpreter(model_path=DTLN_2_PATH)
 interpreter_2.allocate_tensors()
 # Get input and output tensors.
 input_details_1 = interpreter_1.get_input_details()
@@ -61,19 +51,19 @@ output_details_2 = interpreter_2.get_output_details()
 states_1 = np.zeros(input_details_1[1]['shape']).astype('float32')
 states_2 = np.zeros(input_details_2[1]['shape']).astype('float32')
 # calculate block shift for noise suppression model
-block_shift = int(np.round(fs_target * (block_shift_ms / 1000)))
+block_shift = int(np.round(SAMPLING_RATE * (block_shift_ms / 1000)))
 # number of points in block
-block_len = int(np.round(fs_target * (block_len_ms / 1000)))
+block_len = int(np.round(SAMPLING_RATE * (block_len_ms / 1000)))
 # create buffer both for vad and noise suppression models
 in_buffer = np.zeros(block_len).astype('float32')
 out_buffer = np.zeros(block_len).astype('float32')
 
 # load vad model
-vad_model = init_jit_model('models/silero_vad.jit')
+vad_model = init_jit_model(VAD_MODEL_PATH)
 
 def do_smth(audio_proc):
-    a = torch.FloatTensor(audio_proc).reshape(1,-1)
-    torchaudio.backend.soundfile_backend.save('test.wav',a,fs_target)
+    a = torch.FloatTensor(audio_proc).reshape(1, -1)
+    torchaudio.backend.soundfile_backend.save('test.wav', a, SAMPLING_RATE)
 
 
 audio_is_processed = False
@@ -137,7 +127,7 @@ def callback(indata, frames, time, status):
     if current_part == num_of_parts-1:
         current_part = -1
         vad_indata_tnsr = torch.FloatTensor(denoised_audio).squeeze()
-        speech_prob = vad_model(vad_indata_tnsr, fs_target).item()
+        speech_prob = vad_model(vad_indata_tnsr, SAMPLING_RATE).item()
         print(speech_prob)
         i+=1
         if speech_prob > thrsh:
@@ -153,7 +143,7 @@ def callback(indata, frames, time, status):
 
 try:
     with sd.InputStream(device=args.input_device,
-                   samplerate=fs_target, blocksize=block_shift,
+                   samplerate=SAMPLING_RATE, blocksize=block_shift,
                    dtype=np.float32, latency=0.5,
                    channels=1, callback=callback):
 

@@ -4,3 +4,4 @@ data/
 SpeechCommands/
 utils/
 *.wav
+*.pkl
