@@ -16,7 +16,7 @@ from utils.preprocessing import VAD_torch, DTLN_torch
 from utils.utils import *
 
 
-class FirstModelDataset(Dataset):
+class SpeechDataset(Dataset):
     def __init__(self, files, mode, prob, model_type):
         """
         :param files: list of audio files
@@ -49,13 +49,14 @@ class FirstModelDataset(Dataset):
             print(f"{self.model_type} is not correct; correct model_types: 'detector' or 'wake_up'")
             raise NameError
 
-        # для преобразования изображений в тензоры PyTorch и нормализации входа
+        # обработка теста и валидации
         self.transform = torch.nn.Sequential(
             VAD_torch(p=1, mode='test'),
             DTLN_torch(p=1),
             sound_transforms.MFCC(sample_rate=SAMPLING_RATE, n_mfcc=N_MFCC),
             transforms.Resize((SIZE_Y, SIZE_X))  # ИЛИ ПЭДДИНГ???
         )
+        # обработка трейна
         self.data_transforms = torch.nn.Sequential(
             AddBackgroundNoise(BACKGROUND_NOISE_PATH, min_snr_in_db=NOISE_MIN_SNR, max_snr_in_db=NOISE_MAX_SNR,
                                p=self.prob, sample_rate=SAMPLING_RATE),
@@ -63,13 +64,14 @@ class FirstModelDataset(Dataset):
                             p=self.prob, sample_rate=SAMPLING_RATE),
             DTLN_torch(p=self.prob),
             VAD_torch(p=self.prob),
+            # sound_transforms.Spectrogram(n_fft=200),
             sound_transforms.MFCC(sample_rate=SAMPLING_RATE, n_mfcc=N_MFCC),
             transforms.Resize((SIZE_Y, SIZE_X)),  # ИЛИ ПЭДДИНГ???
-            # sound_transforms.FrequencyMasking(),
-            # sound_transforms.TimeMasking(),
+            # sound_transforms.FrequencyMasking(freq_mask_param=32),
+            # sound_transforms.TimeMasking(40),
             # sound_transforms.TimeStretch(),
             # sound_transforms.SlidingWindowCmn()
-            # HighPassFilter(),
+            # HighPassFilter(p=self.prob)
             # LowPassFilter(),
             # PolarityInversion(),
             # Shift(),
@@ -110,7 +112,7 @@ class FirstModelDataset(Dataset):
             y = label_id.item()
         else:
             y = self.labels[index]
-        return x, y
+        return torch.unsqueeze(x, 0), y
 
     def _prepare_sample(self, audio):
         x = torch.FloatTensor(audio)
