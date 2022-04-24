@@ -51,8 +51,8 @@ class SpeechDataset(Dataset):
 
         # обработка теста и валидации
         self.transform = torch.nn.Sequential(
-            VAD_torch(p=1, mode='test'),
-            DTLN_torch(p=1),
+            # VAD_torch(p=1, mode='test'),
+            # DTLN_torch(p=1),
             sound_transforms.MFCC(sample_rate=SAMPLING_RATE, n_mfcc=N_MFCC),
             transforms.Resize((SIZE_Y, SIZE_X))  # ИЛИ ПЭДДИНГ???
         )

@@ -2,7 +2,7 @@ import pandas as pd
 import torch.optim as optim
 from tqdm import tqdm
 from sklearn.metrics import roc_auc_score
-
+from torch.autograd import Variable
 from utils.utils import *
 from train_tools.trainer import create_loaders, Trainer
 from models.WakeUpModel import wake_up_model
@@ -18,8 +18,11 @@ train_loader, val_loader, test_loader = create_loaders(DATA_DIR,
                                                        model_type=MODEL_TYPE,
                                                        validation=False,
                                                        test_size=0.3,
-                                                       batch_size=256,
+                                                       batch_size=1024,
                                                        prob=0.5)
+
+for data, lab in test_loader:
+    print(np.unique(lab))
 
 
 model = wake_up_model(n_channel=n_channel)
@@ -35,9 +38,11 @@ trainer = Trainer(criterion=torch.nn.BCEWithLogitsLoss(),
 
 # The transform needs to live on the same device as the model and the data.
 with tqdm(total=n_epoch) as pbar:
+    torch.set_grad_enabled(True)
     for epoch in range(1, n_epoch + 1):
-        trainer.train_epoch(model, epoch, log_interval, pbar)
+        # trainer.train_epoch(model, epoch, log_interval, pbar)
         trainer.test_epoch(model, epoch, pbar)
-
-results = pd.DataFrame({'loss': trainer.loss_history, 'matric': trainer.metric_history})
-results.to_csv(f'./logs/{MODEL_TYPE}_TrainLog.csv')
+        torch.save(model.state_dict(), SAVE_MODEL_DIR+MODEL_TYPE+'_'+str(epoch)+'.pt')
+print(trainer.metric_history)
+# results = pd.DataFrame({'loss': trainer.loss_history, 'metric': trainer.metric_history})
+# results.to_csv(f'./logs/{MODEL_TYPE}_TrainLog.csv')

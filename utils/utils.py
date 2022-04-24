@@ -25,6 +25,7 @@ NOISE_MIN_SNR = -15
 NOISE_MAX_SNR = -5
 
 DATA_DIR = Path('data/commands/')
+SAVE_MODEL_DIR = 'models/files/'
 
 def int_or_str(text):
     """Helper function for argument parsing."""

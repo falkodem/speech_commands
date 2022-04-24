@@ -88,7 +88,7 @@ class Trainer:
 
             # print training stats
             if batch_idx % log_interval == 0:
-                print(f"Train Epoch: {epoch} [{batch_idx * len(X_batch)}/{len(self.train_loader.dataset)}"
+                print(f"\nTrain Epoch: {epoch} [{batch_idx * len(X_batch)}/{len(self.train_loader.dataset)}"
                       f" ({100. * batch_idx / len(self.train_loader):.0f}%)]")
 
             # update progress bar
@@ -106,8 +106,9 @@ class Trainer:
             y_pred = model(X_test)
 
             # add code for multiclass
-            metric_value = self.metric(y_pred, y_test.unsqueeze(1))
-
+            print(y_pred.detach().cpu().numpy().astype(int))
+            print(y_test.detach().cpu())
+            metric_value = self.metric(y_pred.detach().cpu().numpy().astype(int), y_test.detach().cpu())
             # record metric for epoch
             metric_history_epoch.append(metric_value)
 
