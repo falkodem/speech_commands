@@ -1,7 +1,5 @@
 .idea/
 venv/
 data/
-SpeechCommands/
-utils/
 *.wav
 *.pkl
