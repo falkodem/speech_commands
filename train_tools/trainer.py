@@ -1,52 +1,8 @@
-from sklearn.model_selection import train_test_split
 from tqdm import tqdm
 
 from data_loaders import SpeechDataset
 from torch.utils.data import DataLoader
 from utils.utils import *
-
-
-def create_loaders(path,
-                   model_type='wake_up',
-                   validation=False,
-                   val_size=0.15,
-                   test_size=0.15,
-                   batch_size=1024,
-                   prob=0.5):
-    files = sorted(list(Path(path).rglob('*.wav')))
-    labels = [path.parent.name for path in files]
-
-    if validation:
-        split_size1 = val_size + test_size
-        split_size2 = test_size/(val_size+test_size)
-    else:
-        split_size1 = test_size
-
-    train_files, test_files, train_labels, test_labels = train_test_split(files,
-                                                                          labels,
-                                                                          test_size=split_size1,
-                                                                          stratify=labels,
-                                                                          shuffle=True)
-    if validation:
-        val_files, test_files, val_labels, test_labels = train_test_split(test_files,
-                                                                          test_labels,
-                                                                          test_size=split_size2,
-                                                                          stratify=test_labels,
-                                                                          shuffle=True)
-
-    train_dataset = SpeechDataset(train_files, mode='train', prob=prob, model_type=model_type)
-    test_dataset = SpeechDataset(test_files, mode='test', prob=prob, model_type=model_type)
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=True)
-
-    if validation:
-        val_dataset = SpeechDataset(val_files, mode='val', prob=prob, model_type=model_type)
-        val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=True)
-    else:
-        val_loader = None
-
-    return train_loader, val_loader, test_loader
-
 
 class Trainer:
     def __init__(self,

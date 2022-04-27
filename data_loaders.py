@@ -7,6 +7,7 @@ from torch_audiomentations import AddBackgroundNoise, AddColoredNoise, \
      HighPassFilter, LowPassFilter, PolarityInversion, Shift
 import numpy as np
 from sklearn.preprocessing import LabelEncoder
+from sklearn.model_selection import train_test_split
 import matplotlib.pyplot as plt
 import seaborn as sns
 from scipy.io import wavfile
@@ -17,47 +18,37 @@ from utils.utils import *
 
 
 class SpeechDataset(Dataset):
-    def __init__(self, files, mode, prob, model_type):
+    def __init__(self, files, labels, mode, prob, on_disc_aug=False):
         """
         :param files: list of audio files
+        :param labels: list of labels
         :param mode: generate train, val or test Dataset
         :param prob: probability of applying augmentation
-        :model_type: 'wake_up' model or  command 'detector' model
+        :on_disc_aug: True for write augmented audio on disc
         """
         super().__init__()
         self.wake_up_word = WAKE_UP_WORD
         self.files = sorted(files)
+        self.labels = labels
         self.mode = mode
         self.prob = prob
-        self.model_type = model_type
+        self.on_disc_aug = on_disc_aug
 
         if self.mode not in DATA_MODES:
             print(f"{self.mode} is not correct; correct modes: {DATA_MODES}")
             raise NameError
 
         self.len_ = len(self.files)
-        self.label_encoder = LabelEncoder()
-
-        if self.model_type == 'detector':
-            self.labels = [path.parent.name for path in self.files]
-            self.label_encoder.fit(self.labels)
-            with open('label_encoder.pkl', 'wb') as le_dump_file:
-                pickle.dump(self.label_encoder, le_dump_file)
-        elif self.model_type == 'wake_up':
-            self.labels = [1 if path.parent.name==self.wake_up_word else 0 for path in self.files]
-        else:
-            print(f"{self.model_type} is not correct; correct model_types: 'detector' or 'wake_up'")
-            raise NameError
 
         # обработка теста и валидации
         self.transform = torch.nn.Sequential(
-            # VAD_torch(p=1, mode='test'),
-            # DTLN_torch(p=1),
+            VAD_torch(p=self.prob, mode='test'),
+            DTLN_torch(p=self.prob),
             sound_transforms.MFCC(sample_rate=SAMPLING_RATE, n_mfcc=N_MFCC),
             transforms.Resize((SIZE_Y, SIZE_X))  # ИЛИ ПЭДДИНГ???
         )
         # обработка трейна
-        self.data_transforms = torch.nn.Sequential(
+        self.aug_transforms = torch.nn.Sequential(
             AddBackgroundNoise(BACKGROUND_NOISE_PATH, min_snr_in_db=NOISE_MIN_SNR, max_snr_in_db=NOISE_MAX_SNR,
                                p=self.prob, sample_rate=SAMPLING_RATE),
             AddColoredNoise(min_snr_in_db=NOISE_MIN_SNR, max_snr_in_db=NOISE_MAX_SNR,
@@ -87,6 +78,15 @@ class SpeechDataset(Dataset):
             # кроп начала или конца
         )
 
+        self.aug_transforms_no_mfcc = torch.nn.Sequential(
+            AddBackgroundNoise(BACKGROUND_NOISE_PATH, min_snr_in_db=NOISE_MIN_SNR, max_snr_in_db=NOISE_MAX_SNR,
+                               p=self.prob, sample_rate=SAMPLING_RATE),
+            AddColoredNoise(min_snr_in_db=NOISE_MIN_SNR, max_snr_in_db=NOISE_MAX_SNR,
+                            p=self.prob, sample_rate=SAMPLING_RATE),
+            DTLN_torch(p=self.prob),
+            VAD_torch(p=self.prob)
+        )
+
     def __len__(self):
         return self.len_
 
@@ -101,20 +101,102 @@ class SpeechDataset(Dataset):
     def __getitem__(self, index):
         x = self.load_sample(self.files[index])
         x = self._prepare_sample(x)
-        if self.mode == 'train':
-            x = self.data_transforms(x).squeeze()
+        if self.on_disc_aug:
+            x = self.aug_transforms_no_mfcc(x).squeeze()
         else:
-            x = self.transform(x).squeeze()
+            if self.mode == 'train':
+                x = self.aug_transforms(x).squeeze()
+            else:
+                x = self.transform(x).squeeze()
 
-        if self.model_type == 'detector':
-            label = self.labels[index]
-            label_id = self.label_encoder.transform([label])
-            y = label_id.item()
-        else:
-            y = self.labels[index]
+        y = self.labels[index]
         return torch.unsqueeze(x, 0), y
 
     def _prepare_sample(self, audio):
         x = torch.FloatTensor(audio)
         return ((x - x.mean()) / x.std()).view(1, 1, -1)
 
+
+class LoaderCreator:
+    def __init__(self,
+                 path,
+                 model_type='wake_up',
+                 validation=False,
+                 val_size=0.15,
+                 test_size=0.15,
+                 batch_size=1024,
+                 prob=0.5):
+        """
+        :model_type: 'wake_up' model or command 'detector' model
+        :param path: directory with audio
+        :param validation: create validation dataset or not
+        :param val_size: val dataset fraction
+        :param test_size: test dataset fraction
+        :batch_size: batch size:)
+        :prob: probability of applying augmentation transform (only for train)
+        """
+        self.wake_up_word = WAKE_UP_WORD
+        self.validation = validation
+        self.model_type = model_type
+        self.files = sorted(list(Path(path).rglob('*.wav')))
+
+        if self.model_type == 'detector':
+            self.label_encoder = LabelEncoder()
+            self.labels = self.label_encoder.fit_transform([path.parent.name for path in self.files])
+            with open('label_encoder.pkl', 'wb') as le_dump_file:
+                pickle.dump(self.label_encoder, le_dump_file)
+        elif self.model_type == 'wake_up':
+            self.labels = [1 if path.parent.name == self.wake_up_word else 0 for path in self.files]
+        else:
+            print(f"{self.model_type} is not correct; correct model_types: 'detector' or 'wake_up'")
+            raise NameError
+
+        if self.validation:
+            self.split_size1 = val_size + test_size
+            self.split_size2 = test_size/(val_size+test_size)
+        else:
+            self.split_size1 = test_size
+
+        self.batch_size = batch_size
+        self.prob = prob
+
+    def get_loaders(self):
+        train_files, test_files, train_labels, test_labels = train_test_split(self.files,
+                                                                              self.labels,
+                                                                              test_size=self.split_size1,
+                                                                              stratify=self.labels,
+                                                                              shuffle=True)
+
+        if self.validation:
+            val_files, test_files, val_labels, test_labels = train_test_split(test_files,
+                                                                              test_labels,
+                                                                              test_size=self.split_size2,
+                                                                              stratify=test_labels,
+                                                                              shuffle=True)
+
+        train_dataset = SpeechDataset(files=train_files, labels=train_labels, mode='train', prob=self.prob)
+        test_dataset = SpeechDataset(files=test_files, labels=test_labels, mode='test', prob=1)
+        train_loader = DataLoader(train_dataset, batch_size=self.batch_size, shuffle=True)
+        test_loader = DataLoader(test_dataset, batch_size=self.batch_size, shuffle=True)
+
+        if self.validation:
+            val_dataset = SpeechDataset(files=val_files, labels=val_labels, mode='val', prob=1)
+            val_loader = DataLoader(val_dataset, batch_size=self.batch_size, shuffle=True)
+        else:
+            val_loader = None
+
+        return train_loader, val_loader, test_loader
+
+    @staticmethod
+    def augmentation_loader(path, prob):
+        """
+        This method id used for creating augmented audiofiles for writing on the disc.
+        The reason for it is that at this moment VAD и DTLN are the bottleneck of "on the fly" augmentation,
+        so training process increases in 20-50 times compared to not using these augmentation methods.
+        """
+        files = sorted(list(Path(path).rglob('*.wav')))
+        labels = [path.parent.name for path in files]
+        aug_dataset = SpeechDataset(files=files, labels=labels, mode='train', prob=prob, on_disc_aug=True)
+        dataset_loader = DataLoader(aug_dataset, batch_size=1, shuffle=False)
+
+        return dataset_loader

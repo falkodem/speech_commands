@@ -21,8 +21,8 @@ THRESHOLD = 0.1  # classification threshold
 DATA_MODES = ['train', 'val', 'test']
 
 N_MFCC = 32
-NOISE_MIN_SNR = -15
-NOISE_MAX_SNR = -5
+NOISE_MIN_SNR = 0
+NOISE_MAX_SNR = 15
 
 DATA_DIR = Path('data/commands/')
 SAVE_MODEL_DIR = 'models/files/'

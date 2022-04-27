@@ -4,7 +4,8 @@ from tqdm import tqdm
 from sklearn.metrics import roc_auc_score
 from torch.autograd import Variable
 from utils.utils import *
-from train_tools.trainer import create_loaders, Trainer
+from train_tools.trainer import Trainer
+from data_loaders import create_loaders
 from models.WakeUpModel import wake_up_model
 
 MODEL_TYPE = 'wake_up'
