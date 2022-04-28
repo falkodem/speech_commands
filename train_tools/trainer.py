@@ -36,7 +36,6 @@ class Trainer:
 
             self.optimizer.zero_grad()
             y_pred = model(X_batch)
-
             loss = self.criterion(y_pred, y_batch.unsqueeze(1).float())
             loss.backward()
 
@@ -51,8 +50,8 @@ class Trainer:
             pbar.update(self.pbar_update)
             # accumulate loss for epoch
             loss_epoch += loss.item()
-
         self.loss_history.append(loss_epoch)
+        print(f"\nEpoch: {epoch}\t\tLoss: {loss_epoch}")
 
     def test_epoch(self, model, epoch, pbar):
         model.eval()
@@ -62,9 +61,7 @@ class Trainer:
             y_pred = model(X_test)
 
             # add code for multiclass
-            print(y_pred.detach().cpu().numpy().astype(int))
-            print(y_test.detach().cpu())
-            metric_value = self.metric(y_pred.detach().cpu().numpy().astype(int), y_test.detach().cpu())
+            metric_value = self.metric(y_test.detach().cpu(), y_pred.detach().cpu().numpy())
             # record metric for epoch
             metric_history_epoch.append(metric_value)
 
@@ -73,6 +70,6 @@ class Trainer:
 
         mean_metric_epoch = np.mean(metric_history_epoch)
         self.metric_history.append(mean_metric_epoch)
-        print(f"\nTest Epoch: {epoch}\tMetric: {mean_metric_epoch}")
+        print(f"\nEpoch: {epoch}\t\tMetric: {mean_metric_epoch}")
 
 

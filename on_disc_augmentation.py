@@ -17,7 +17,7 @@ except FileNotFoundError:
     indexes = {}
     print('Rewriting files...')
 
-replication_rate = 6
+replication_rate = 20
 for epoch in range(replication_rate):
     for data, label in tqdm(aug_loader):
         if indexes.get(label[0]) is None:

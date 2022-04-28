@@ -18,13 +18,15 @@ from utils.utils import *
 
 
 class SpeechDataset(Dataset):
-    def __init__(self, files, labels, mode, prob, on_disc_aug=False):
+    def __init__(self, files, labels, mode, prob, to_disc=False, from_disc=False):
         """
         :param files: list of audio files
         :param labels: list of labels
         :param mode: generate train, val or test Dataset
-        :param prob: probability of applying augmentation
-        :on_disc_aug: True for write augmented audio on disc
+        :param prob: probability of applying augmentation (not used if from_disc=True)
+        :to_disc: True if you wand to augment and write audio on disc (using <augmentation_loader> method),
+         False if you want to augment on the fly
+        :from_disc: True if you want to load augmented dataset from disc, without applying any augmentation
         """
         super().__init__()
         self.wake_up_word = WAKE_UP_WORD
@@ -32,7 +34,8 @@ class SpeechDataset(Dataset):
         self.labels = labels
         self.mode = mode
         self.prob = prob
-        self.on_disc_aug = on_disc_aug
+        self.to_disc = to_disc
+        self.from_disc = from_disc
 
         if self.mode not in DATA_MODES:
             print(f"{self.mode} is not correct; correct modes: {DATA_MODES}")
@@ -87,6 +90,12 @@ class SpeechDataset(Dataset):
             VAD_torch(p=self.prob)
         )
 
+        self.aug_transforms_no_preproc = torch.nn.Sequential(
+            sound_transforms.Spectrogram(n_fft=100),
+            # sound_transforms.MFCC(sample_rate=SAMPLING_RATE, n_mfcc=N_MFCC),
+            transforms.Resize((SIZE_Y, SIZE_X)),  # ИЛИ ПЭДДИНГ???
+        )
+
     def __len__(self):
         return self.len_
 
@@ -101,8 +110,10 @@ class SpeechDataset(Dataset):
     def __getitem__(self, index):
         x = self.load_sample(self.files[index])
         x = self._prepare_sample(x)
-        if self.on_disc_aug:
+        if self.to_disc:
             x = self.aug_transforms_no_mfcc(x).squeeze()
+        elif self.from_disc:
+            x = self.aug_transforms_no_preproc(x).squeeze()
         else:
             if self.mode == 'train':
                 x = self.aug_transforms(x).squeeze()
@@ -125,20 +136,23 @@ class LoaderCreator:
                  val_size=0.15,
                  test_size=0.15,
                  batch_size=1024,
-                 prob=0.5):
+                 prob=0.5,
+                 from_disc=False):
         """
         :model_type: 'wake_up' model or command 'detector' model
         :param path: directory with audio
         :param validation: create validation dataset or not
         :param val_size: val dataset fraction
         :param test_size: test dataset fraction
-        :batch_size: batch size:)
+        :batch_size: batch size
         :prob: probability of applying augmentation transform (only for train)
+        :from_disc: True if you want to load augmented dataset from disc, without applying any augmentation
         """
         self.wake_up_word = WAKE_UP_WORD
         self.validation = validation
         self.model_type = model_type
         self.files = sorted(list(Path(path).rglob('*.wav')))
+        self.from_disc = from_disc
 
         if self.model_type == 'detector':
             self.label_encoder = LabelEncoder()
@@ -174,13 +188,16 @@ class LoaderCreator:
                                                                               stratify=test_labels,
                                                                               shuffle=True)
 
-        train_dataset = SpeechDataset(files=train_files, labels=train_labels, mode='train', prob=self.prob)
-        test_dataset = SpeechDataset(files=test_files, labels=test_labels, mode='test', prob=1)
+        train_dataset = SpeechDataset(files=train_files, labels=train_labels, mode='train', prob=self.prob,
+                                      from_disc=self.from_disc)
+        test_dataset = SpeechDataset(files=test_files, labels=test_labels, mode='test', prob=1,
+                                     from_disc=self.from_disc)
         train_loader = DataLoader(train_dataset, batch_size=self.batch_size, shuffle=True)
         test_loader = DataLoader(test_dataset, batch_size=self.batch_size, shuffle=True)
 
         if self.validation:
-            val_dataset = SpeechDataset(files=val_files, labels=val_labels, mode='val', prob=1)
+            val_dataset = SpeechDataset(files=val_files, labels=val_labels, mode='val', prob=1,
+                                        from_disc=self.from_disc)
             val_loader = DataLoader(val_dataset, batch_size=self.batch_size, shuffle=True)
         else:
             val_loader = None
@@ -196,7 +213,7 @@ class LoaderCreator:
         """
         files = sorted(list(Path(path).rglob('*.wav')))
         labels = [path.parent.name for path in files]
-        aug_dataset = SpeechDataset(files=files, labels=labels, mode='train', prob=prob, on_disc_aug=True)
+        aug_dataset = SpeechDataset(files=files, labels=labels, mode='train', prob=prob, to_disc=True)
         dataset_loader = DataLoader(aug_dataset, batch_size=1, shuffle=False)
 
         return dataset_loader

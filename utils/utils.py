@@ -9,8 +9,8 @@ DTLN_2_PATH = 'models/files/model_2.tflite'
 BACKGROUND_NOISE_PATH = 'data/noise/'
 
 SAMPLING_RATE = 16000
-SIZE_X = 48
-SIZE_Y = 32
+SIZE_X = 256
+SIZE_Y = 64
 BLOCK_LEN_MS = 32  # block len in ms
 BLOCK_SHIFT_MS = 8  # block shift in ms
 
@@ -25,7 +25,9 @@ NOISE_MIN_SNR = 0
 NOISE_MAX_SNR = 15
 
 DATA_DIR = Path('data/commands/')
+DATA_DIR_AUGMENTED = Path('data/augmented')
 SAVE_MODEL_DIR = 'models/files/'
+
 
 def int_or_str(text):
     """Helper function for argument parsing."""
@@ -34,5 +36,7 @@ def int_or_str(text):
     except ValueError:
         return text
 
+
 def accuracy(labels, preds):
     return (preds.argmax(dim=1) == labels).float().mean().data.cpu()
+
