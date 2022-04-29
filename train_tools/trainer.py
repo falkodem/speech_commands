@@ -1,5 +1,5 @@
 from tqdm import tqdm
-
+from sklearn.metrics import accuracy_score
 from data_loaders import SpeechDataset
 from torch.utils.data import DataLoader
 from utils.utils import *
@@ -24,8 +24,7 @@ class Trainer:
         self.device = device
         self.pbar_update = 1 / (len(self.train_loader) + len(self.test_loader))
 
-
-        if (self.model_type != 'wake_up') & (self.metric != accuracy):
+        if (self.model_type != 'wake_up') & (self.metric != accuracy_score):
             raise ValueError("Only accuracy-metric is supported for multiclass classification (second model)")
 
     def train_epoch(self, model, epoch, log_interval, pbar):
@@ -36,7 +35,9 @@ class Trainer:
 
             self.optimizer.zero_grad()
             y_pred = model(X_batch)
+
             loss = self.criterion(y_pred, y_batch.unsqueeze(1).float())
+            # loss = self.criterion(y_pred, y_batch)
             loss.backward()
 
             self.optimizer.step()
@@ -59,9 +60,12 @@ class Trainer:
         for X_test, y_test in self.test_loader:
             X_test, y_test = X_test.to(self.device), y_test.to(self.device)
             y_pred = model(X_test)
-
             # add code for multiclass
+            # print(y_pred[y_test == 1][:7].flatten())
+            # print(y_pred[y_test == 0][:7].flatten())
+
             metric_value = self.metric(y_test.detach().cpu(), y_pred.detach().cpu().numpy())
+            # metric_value = self.metric(y_test.detach().cpu(), np.argmax(y_pred.detach().cpu().numpy(), axis=1))
             # record metric for epoch
             metric_history_epoch.append(metric_value)
 

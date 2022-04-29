@@ -9,8 +9,8 @@ DTLN_2_PATH = 'models/files/model_2.tflite'
 BACKGROUND_NOISE_PATH = 'data/noise/'
 
 SAMPLING_RATE = 16000
-SIZE_X = 256
-SIZE_Y = 64
+SIZE_X = 128
+SIZE_Y = 32
 BLOCK_LEN_MS = 32  # block len in ms
 BLOCK_SHIFT_MS = 8  # block shift in ms
 

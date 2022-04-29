@@ -6,6 +6,8 @@ from utils.vad_functions import *
 from utils.utils import *
 from torch.distributions import Bernoulli
 import tflite_runtime.interpreter as tflite
+from scipy import fft
+from scipy.fftpack import dct
 
 
 class VAD_torch(torch.nn.Module):
@@ -114,3 +116,79 @@ class DTLN_torch(torch.nn.Module):
         else:
 
             return audio
+
+
+class MFCC(torch.nn.Module):
+
+    def __init__(self, fs, NFFT=512, num_ceps=14, normalize=False, only_mel=False):
+        super(MFCC, self).__init__()
+        self.fs = fs
+        self.NFFT = NFFT
+        self.num_ceps = num_ceps
+        self.normalize = normalize
+        self.only_mel = only_mel
+        self.frame_size = 0.02  # 20мс
+        self.frame_stride = 0.01  # шаг 10 мс
+        self.frame_length = int(round(fs * self.frame_size))
+        self.frame_step = int(round(fs * self.frame_stride))
+
+    def forward(self, data):
+        data = data.flatten()
+        signal_length = len(data)
+
+        num_full_frames = int(np.ceil(float(np.abs(
+            signal_length - self.frame_length)) / self.frame_step))  # Число фреймов, полностью заполненных полезным сигналом
+
+        pad_signal_length = num_full_frames * self.frame_step + self.frame_length  # длина исходного сигнала + нули в конце, чтобы стало целое число фремов
+        z = np.zeros((pad_signal_length - signal_length))  # добавляем нули к последнему фрейму чтобы его заполнить
+        pad_signal = np.append(data, z)  # теперь в сигнале полное число фреймов, но последний дополняется нулями
+        num_frames = num_full_frames + 1  # полное число фреймов
+
+        indices = np.tile(np.arange(0, self.frame_length), (num_frames, 1)) + np.tile(
+            np.arange(0, num_full_frames * self.frame_step + 1, self.frame_step),
+            (self.frame_length, 1)).T  # матрица индексов: строки -фреймы, столбы - элементы фрейма
+        frames = pad_signal[indices]
+
+        # Хэмминг + Фурье
+        T = 1.0 / self.fs
+        w = np.hamming(self.frame_length)  # Окно Хэмминга
+        frames_fourier_w = np.abs(fft.rfft(frames * w, self.NFFT))
+        # Вычисляем периодограмму каждого фрейма ( спектральную мощность )
+        P = ((frames_fourier_w) ** 2) / self.NFFT  # Power Spectrum
+        # Вычисляем блок мел-фильтров(треугольных)
+        nfilt = 40
+        low_freq_mel = 0
+        high_freq_mel = (2595 * np.log10(1 + (self.fs / 2) / 700))  # Переводим герцы в мелы
+        mel_points = np.linspace(low_freq_mel, high_freq_mel, nfilt + 2)  # равномерно распределены по мел шкале
+        hz_points = (700 * (10 ** (mel_points / 2595) - 1))  # мелы в герцы
+        bin = np.floor((self.NFFT + 1) * hz_points / self.fs)
+
+        fbank = np.zeros((nfilt, int(np.floor(self.NFFT / 2 + 1))))
+        for m in range(1, nfilt + 1):
+            f_m_minus = int(bin[m - 1])  # left
+            f_m = int(bin[m])  # center
+            f_m_plus = int(bin[m + 1])  # right
+
+            for k in range(f_m_minus, f_m):
+                fbank[m - 1, k] = (k - bin[m - 1]) / (bin[m] - bin[m - 1])
+            for k in range(f_m, f_m_plus):
+                fbank[m - 1, k] = (bin[m + 1] - k) / (bin[m + 1] - bin[m])
+
+        filter_banks = np.dot(P, fbank.T).T
+        filter_banks = np.where(filter_banks == 0, np.finfo(float).eps, filter_banks)  # Numerical Stability
+        filter_banks = 20 * np.log10(filter_banks)  # dB
+
+        if self.normalize:
+            filter_banks = filter_banks - (np.mean(filter_banks, axis=0).reshape(1, -1) + 1e-8)
+            # filter_banks = filter_banks/np.max(filter_banks)
+            # filter_banks = (filter_banks - np.mean(filter_banks))/np.std(filter_banks)
+
+        if self.only_mel:
+            # берем 14 коэфов
+            coefs = filter_banks[1: (self.num_ceps + 1), :]
+        else:
+            # дискретное косинусное преобразование
+            # число мел-кепстральных коэффов, остальные отбрасываем потому что они отражают быстрые изменения сигнала
+            coefs = dct(filter_banks, type=2, axis=0, norm='ortho')[1: (self.num_ceps + 1), :]  # Берем 2-14
+
+        return torch.FloatTensor(coefs).unsqueeze(0)

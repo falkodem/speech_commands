@@ -13,7 +13,7 @@ import seaborn as sns
 from scipy.io import wavfile
 from pathlib import Path
 
-from utils.preprocessing import VAD_torch, DTLN_torch
+from utils.preprocessing import VAD_torch, DTLN_torch, MFCC
 from utils.utils import *
 
 
@@ -30,7 +30,7 @@ class SpeechDataset(Dataset):
         """
         super().__init__()
         self.wake_up_word = WAKE_UP_WORD
-        self.files = sorted(files)
+        self.files = files
         self.labels = labels
         self.mode = mode
         self.prob = prob
@@ -91,7 +91,8 @@ class SpeechDataset(Dataset):
         )
 
         self.aug_transforms_no_preproc = torch.nn.Sequential(
-            sound_transforms.Spectrogram(n_fft=100),
+            # sound_transforms.Spectrogram(n_fft=100,normalized=False),
+            MFCC(fs=SAMPLING_RATE, num_ceps=32, normalize=True, only_mel=False),
             # sound_transforms.MFCC(sample_rate=SAMPLING_RATE, n_mfcc=N_MFCC),
             transforms.Resize((SIZE_Y, SIZE_X)),  # ИЛИ ПЭДДИНГ???
         )
@@ -114,6 +115,19 @@ class SpeechDataset(Dataset):
             x = self.aug_transforms_no_mfcc(x).squeeze()
         elif self.from_disc:
             x = self.aug_transforms_no_preproc(x).squeeze()
+
+            # x = x + 1e-10
+
+            # print(self.mode)
+            # print('idx:',index)
+            # print('label:',self.labels[index])
+            # print(self.files[index])
+            # print('-'*10)
+
+            # f1, ax = plt.subplots(figsize=(15, 6))
+            # sns.heatmap(x, annot=False, vmin=0, fmt=".1f")
+            # ax.invert_yaxis()
+            # plt.show()
         else:
             if self.mode == 'train':
                 x = self.aug_transforms(x).squeeze()
@@ -151,16 +165,16 @@ class LoaderCreator:
         self.wake_up_word = WAKE_UP_WORD
         self.validation = validation
         self.model_type = model_type
-        self.files = sorted(list(Path(path).rglob('*.wav')))
+        self.files = sorted(list(Path(path).rglob('*.wav'))) #???????
         self.from_disc = from_disc
 
         if self.model_type == 'detector':
             self.label_encoder = LabelEncoder()
-            self.labels = self.label_encoder.fit_transform([path.parent.name for path in self.files])
+            self.labels = self.label_encoder.fit_transform([pth.parent.name for pth in self.files])
             with open('label_encoder.pkl', 'wb') as le_dump_file:
                 pickle.dump(self.label_encoder, le_dump_file)
         elif self.model_type == 'wake_up':
-            self.labels = [1 if path.parent.name == self.wake_up_word else 0 for path in self.files]
+            self.labels = [1 if pth.parent.name == self.wake_up_word else 0 for pth in self.files]
         else:
             print(f"{self.model_type} is not correct; correct model_types: 'detector' or 'wake_up'")
             raise NameError
@@ -187,9 +201,11 @@ class LoaderCreator:
                                                                               test_size=self.split_size2,
                                                                               stratify=test_labels,
                                                                               shuffle=True)
-
+        # print('**'*20,train_files[:6],train_labels[:6])
         train_dataset = SpeechDataset(files=train_files, labels=train_labels, mode='train', prob=self.prob,
                                       from_disc=self.from_disc)
+        # print('%%'*20,train_dataset.files[:6],train_dataset.labels[:6])
+
         test_dataset = SpeechDataset(files=test_files, labels=test_labels, mode='test', prob=1,
                                      from_disc=self.from_disc)
         train_loader = DataLoader(train_dataset, batch_size=self.batch_size, shuffle=True)
