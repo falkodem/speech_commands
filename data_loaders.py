@@ -45,9 +45,10 @@ class SpeechDataset(Dataset):
 
         # обработка теста и валидации
         self.transform = torch.nn.Sequential(
-            VAD_torch(p=self.prob, mode='test'),
-            DTLN_torch(p=self.prob),
-            sound_transforms.MFCC(sample_rate=SAMPLING_RATE, n_mfcc=N_MFCC),
+            VAD_torch(p=1, mode='test'),
+            DTLN_torch(p=1),
+            # sound_transforms.MFCC(sample_rate=SAMPLING_RATE, n_mfcc=N_MFCC),
+            MFCC(fs=SAMPLING_RATE, num_ceps=32, normalize=True, only_mel=False),
             transforms.Resize((SIZE_Y, SIZE_X))  # ИЛИ ПЭДДИНГ???
         )
         # обработка трейна
@@ -59,7 +60,8 @@ class SpeechDataset(Dataset):
             DTLN_torch(p=self.prob),
             VAD_torch(p=self.prob),
             # sound_transforms.Spectrogram(n_fft=200),
-            sound_transforms.MFCC(sample_rate=SAMPLING_RATE, n_mfcc=N_MFCC),
+            # sound_transforms.MFCC(sample_rate=SAMPLING_RATE, n_mfcc=N_MFCC),
+            MFCC(fs=SAMPLING_RATE, num_ceps=32, normalize=True, only_mel=False),
             transforms.Resize((SIZE_Y, SIZE_X)),  # ИЛИ ПЭДДИНГ???
             # sound_transforms.FrequencyMasking(freq_mask_param=32),
             # sound_transforms.TimeMasking(40),
@@ -151,7 +153,8 @@ class LoaderCreator:
                  test_size=0.15,
                  batch_size=1024,
                  prob=0.5,
-                 from_disc=False):
+                 from_disc=False,
+                 seed=42):
         """
         :model_type: 'wake_up' model or command 'detector' model
         :param path: directory with audio
@@ -161,12 +164,14 @@ class LoaderCreator:
         :batch_size: batch size
         :prob: probability of applying augmentation transform (only for train)
         :from_disc: True if you want to load augmented dataset from disc, without applying any augmentation
+        :seed: random seed for train-test split
         """
         self.wake_up_word = WAKE_UP_WORD
         self.validation = validation
         self.model_type = model_type
-        self.files = sorted(list(Path(path).rglob('*.wav'))) #???????
+        self.files = sorted(list(Path(path).rglob('*.wav')))
         self.from_disc = from_disc
+        self.seed = seed
 
         if self.model_type == 'detector':
             self.label_encoder = LabelEncoder()
@@ -184,6 +189,7 @@ class LoaderCreator:
             self.split_size2 = test_size/(val_size+test_size)
         else:
             self.split_size1 = test_size
+            self.split_size2 = 0
 
         self.batch_size = batch_size
         self.prob = prob
@@ -193,14 +199,17 @@ class LoaderCreator:
                                                                               self.labels,
                                                                               test_size=self.split_size1,
                                                                               stratify=self.labels,
-                                                                              shuffle=True)
-
+                                                                              shuffle=True,
+                                                                              random_state=self.seed)
+        import joblib
+        joblib.dump(test_labels, './test_split')
         if self.validation:
             val_files, test_files, val_labels, test_labels = train_test_split(test_files,
                                                                               test_labels,
                                                                               test_size=self.split_size2,
                                                                               stratify=test_labels,
-                                                                              shuffle=True)
+                                                                              shuffle=True,
+                                                                              random_state=self.seed)
         # print('**'*20,train_files[:6],train_labels[:6])
         train_dataset = SpeechDataset(files=train_files, labels=train_labels, mode='train', prob=self.prob,
                                       from_disc=self.from_disc)
