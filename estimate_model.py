@@ -3,19 +3,21 @@ from sklearn.metrics import roc_auc_score, average_precision_score, precision_sc
 import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
+import joblib
 from models.WakeUpModel import WakeUpModel
 from data_loaders import LoaderCreator
 from utils.utils import *
 
 
 MODEL_TYPE = 'wake_up'
-best_epoch = 5
+best_epoch = 19
+time_folder = '01052022_12-20'
 
-results = pd.read_csv(f'./logs/{MODEL_TYPE}_TrainLog.csv')
+results = joblib.load(f'./logs/{MODEL_TYPE}/{time_folder}/{MODEL_TYPE}_TrainLog')
 f, ax = plt.subplots(1,2,figsize=(12, 6))
-ax[0].plot(results['loss'])
-ax[0].plot(results['loss_test'])
-ax[1].plot(results['metric'])
+ax[0].plot(results['loss_history'])
+ax[0].plot(results['loss_history_test'])
+ax[1].plot(results['metric_history'])
 
 ax[0].grid()
 ax[1].grid()
@@ -33,10 +35,11 @@ LC = LoaderCreator(DATA_DIR,
                    from_disc=True,
                    seed=SEED)
 
-_, _, test_loader = LC.get_loaders()
+train_loader, _, test_loader = LC.get_loaders()
 
 model = WakeUpModel(n_channel=N_CHANNEL_WAKE_UP)
-model.load_state_dict(torch.load(SAVE_MODEL_DIR + MODEL_TYPE + '_' + str(best_epoch) + '.pt'))
+model.load_state_dict(torch.load(SAVE_MODEL_DIR + MODEL_TYPE + '/' + time_folder + '/' + MODEL_TYPE + '_' + 'epoch_' +
+                                 str(best_epoch) + '.pt'))
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(device)
 model.to(device)
@@ -60,9 +63,10 @@ plt.plot(prec)
 plt.plot(rec)
 plt.plot(thrsh)
 plt.grid()
-print(precision_score(labels, preds>0.55))
-print(recall_score(labels, preds>0.55))
-print(fbeta_score(labels, preds>0.55, beta = 2))
+print('Precision', precision_score(labels, preds>0.55))
+print('Recall',recall_score(labels, preds>0.55))
+print('Fbeta2 score',fbeta_score(labels, preds>0.55, beta = 2))
+plt.legend(['Точность (precision)','Полнота (recall)','F-мера beta=2 (Fbeta2-score)'])
 plt.show()
 
 

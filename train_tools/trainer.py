@@ -110,7 +110,6 @@ class Trainer:
             # accumulate loss for epoch
             loss_epoch += loss.item() / df_len
         self.loss_history.append(loss_epoch)
-        print(f"\nEpoch: {epoch}\t\tLoss: {loss_epoch}")
 
     def test_epoch(self, model, epoch, pbar):
         model.eval()
@@ -142,5 +141,3 @@ class Trainer:
         mean_metric_epoch = np.mean(metric_history_epoch)
         self.metric_history.append(mean_metric_epoch)
 
-        print(f"\nEpoch: {epoch}\t\tLoss test: {loss_epoch_test}")
-        print(f"\nEpoch: {epoch}\t\tMetric: {mean_metric_epoch}")

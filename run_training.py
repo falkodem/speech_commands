@@ -8,8 +8,8 @@ from models.WakeUpModel import WakeUpModel
 
 MODEL_TYPE = 'wake_up'
 
-criterion = torch.nn.BCEWithLogitsLoss()
-from_disc = True
+criterion = torch.nn.BCELoss()
+from_disc = False
 if from_disc:
     path = DATA_DIR_AUGMENTED
 else:
@@ -18,7 +18,7 @@ else:
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(device)
 
-LC = LoaderCreator(DATA_DIR,
+LC = LoaderCreator(path,
                    model_type=MODEL_TYPE,
                    validation=False,
                    test_size=TEST_SIZE,

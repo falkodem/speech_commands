@@ -18,7 +18,7 @@ BLOCK_SHIFT_MS = 8  # block shift in ms
 # Training params
 BATCH_SIZE = 256
 N_CHANNEL_WAKE_UP = 8
-N_EPOCH = 20
+N_EPOCH = 35
 LOG_INTERVAL = 20
 TEST_SIZE = 0.15
 PROB = 0.25

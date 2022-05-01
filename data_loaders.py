@@ -210,11 +210,10 @@ class LoaderCreator:
                                                                               stratify=test_labels,
                                                                               shuffle=True,
                                                                               random_state=self.seed)
-        # print('**'*20,train_files[:6],train_labels[:6])
+        # print('**'*20,test_files[:6], test_labels[:6])
         train_dataset = SpeechDataset(files=train_files, labels=train_labels, mode='train', prob=self.prob,
                                       from_disc=self.from_disc)
-        # print('%%'*20,train_dataset.files[:6],train_dataset.labels[:6])
-
+        # print('%%' * 20, train_dataset.files[:6], train_dataset.labels[:6])
         test_dataset = SpeechDataset(files=test_files, labels=test_labels, mode='test', prob=1,
                                      from_disc=self.from_disc)
         train_loader = DataLoader(train_dataset, batch_size=self.batch_size, shuffle=True)
