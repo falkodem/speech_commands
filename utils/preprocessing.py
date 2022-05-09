@@ -10,9 +10,9 @@ from scipy import fft
 from scipy.fftpack import dct
 
 
-class VAD_torch(torch.nn.Module):
+class VAD(torch.nn.Module):
     def __init__(self, p=0.5, mode='train_val'):
-        super(VAD_torch, self).__init__()
+        super(VAD, self).__init__()
         self.vad_model = init_jit_model(VAD_MODEL_PATH)
         self.p = p
         self.apply_vad = Bernoulli(self.p)
@@ -42,9 +42,9 @@ class VAD_torch(torch.nn.Module):
             raise ValueError
 
 
-class DTLN_torch(torch.nn.Module):
+class DTLN(torch.nn.Module):
     def __init__(self, p=0.5):
-        super(DTLN_torch, self).__init__()
+        super(DTLN, self).__init__()
         # load models
         self.interpreter_1 = tflite.Interpreter(model_path=DTLN_1_PATH)
         self.interpreter_1.allocate_tensors()
@@ -117,6 +117,41 @@ class DTLN_torch(torch.nn.Module):
 
             return audio
 
+    def forward_realtime(self, audio, in_buffer, out_buffer):
+        in_buffer[:-BLOCK_SHIFT] = in_buffer[BLOCK_SHIFT:]
+        in_buffer[-BLOCK_SHIFT:] = np.squeeze(audio)
+        # calculate fft of input block
+        in_block_fft = np.fft.rfft(in_buffer)
+        in_mag = np.abs(in_block_fft)
+        in_phase = np.angle(in_block_fft)
+        # reshape magnitude to input dimensions
+        in_mag = np.reshape(in_mag, (1, 1, -1)).astype('float32')
+        # set tensors to the first model
+        self.interpreter_1.set_tensor(self.input_details_1[1]['index'], self.states_1)
+        self.interpreter_1.set_tensor(self.input_details_1[0]['index'], in_mag)
+        # run calculation
+        self.interpreter_1.invoke()
+        # get the output of the first block
+        out_mask = self.interpreter_1.get_tensor(self.output_details_1[0]['index'])
+        self.states_1 = self.interpreter_1.get_tensor(self.output_details_1[1]['index'])
+        # calculate the ifft
+        estimated_complex = in_mag * out_mask * np.exp(1j * in_phase)
+        estimated_block = np.fft.irfft(estimated_complex)
+        # reshape the time domain block
+        estimated_block = np.reshape(estimated_block, (1, 1, -1)).astype('float32')
+        # set tensors to the second block
+        self.interpreter_2.set_tensor(self.input_details_2[1]['index'], self.states_2)
+        self.interpreter_2.set_tensor(self.input_details_2[0]['index'], estimated_block)
+        # run calculation
+        self.interpreter_2.invoke()
+        # get output tensors
+        out_block = self.interpreter_2.get_tensor(self.output_details_2[0]['index'])
+        self.states_2 = self.interpreter_2.get_tensor(self.output_details_2[1]['index'])
+        # write to buffer
+        out_buffer[:-BLOCK_SHIFT] = out_buffer[BLOCK_SHIFT:]
+        out_buffer[-BLOCK_SHIFT:] = np.zeros(BLOCK_SHIFT)
+        out_buffer[-BLOCK_LEN:] = out_buffer[-BLOCK_LEN:] + np.squeeze(out_block)
+        return in_buffer, out_buffer
 
 class MFCC(torch.nn.Module):
 

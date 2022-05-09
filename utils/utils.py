@@ -16,8 +16,16 @@ SIZE_Y = 32
 # SIZE_X = 224
 # SIZE_Y = 224
 NUM_CEPS = 32
+
+# Infer VAD and DTLN params
 BLOCK_LEN_MS = 32  # block len in ms
 BLOCK_SHIFT_MS = 8  # block shift in ms
+BLOCK_SHIFT = int(np.round(SAMPLING_RATE * (BLOCK_SHIFT_MS / 1000)))
+# number of points in block
+BLOCK_LEN = int(np.round(SAMPLING_RATE * (BLOCK_LEN_MS / 1000)))
+NUM_OF_PARTS = BLOCK_LEN_MS//BLOCK_SHIFT_MS
+VAD_THRESHOLD = 0.1  # VAD classification threshold
+LATENCY = 0.7
 
 # Training params
 BATCH_SIZE = 16
@@ -29,11 +37,6 @@ PROB = 0.25
 N_MFCC = 32
 NOISE_MIN_SNR = -10
 NOISE_MAX_SNR = 15
-
-# Infer VAD and DTLN params
-BLOCK_LEN = int(np.round(SAMPLING_RATE * (BLOCK_LEN_MS / 1000)))  # block len in samples
-BLOCK_SHIFT = int(np.round(SAMPLING_RATE * (BLOCK_SHIFT_MS / 1000)))  # block shift in samples
-THRESHOLD = 0.1  # VAD classification threshold
 
 # other
 DATA_MODES = ['train', 'val', 'test']

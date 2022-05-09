@@ -13,7 +13,7 @@ import seaborn as sns
 from scipy.io import wavfile
 from pathlib import Path
 
-from utils.preprocessing import VAD_torch, DTLN_torch, MFCC
+from utils.preprocessing import VAD, DTLN, MFCC
 from utils.utils import *
 
 
@@ -45,8 +45,8 @@ class SpeechDataset(Dataset):
 
         # обработка теста и валидации
         self.transform = torch.nn.Sequential(
-            VAD_torch(p=1, mode='test'),
-            DTLN_torch(p=1),
+            DTLN(p=1),
+            VAD(p=1, mode='test'),
             # sound_transforms.MFCC(sample_rate=SAMPLING_RATE, n_mfcc=N_MFCC),
             MFCC(fs=SAMPLING_RATE, num_ceps=NUM_CEPS, normalize=True, only_mel=False),
             transforms.Resize((SIZE_Y, SIZE_X))  # ИЛИ ПЭДДИНГ???
@@ -57,8 +57,8 @@ class SpeechDataset(Dataset):
                                p=self.prob, sample_rate=SAMPLING_RATE),
             AddColoredNoise(min_snr_in_db=NOISE_MIN_SNR, max_snr_in_db=NOISE_MAX_SNR,
                             p=self.prob, sample_rate=SAMPLING_RATE),
-            DTLN_torch(p=self.prob),
-            VAD_torch(p=self.prob),
+            DTLN(p=self.prob),
+            VAD(p=self.prob),
             # sound_transforms.Spectrogram(n_fft=200),
             # sound_transforms.MFCC(sample_rate=SAMPLING_RATE, n_mfcc=N_MFCC),
             MFCC(fs=SAMPLING_RATE, num_ceps=NUM_CEPS, normalize=True, only_mel=False),
@@ -88,8 +88,8 @@ class SpeechDataset(Dataset):
                                p=self.prob, sample_rate=SAMPLING_RATE),
             AddColoredNoise(min_snr_in_db=NOISE_MIN_SNR, max_snr_in_db=NOISE_MAX_SNR,
                             p=self.prob, sample_rate=SAMPLING_RATE),
-            DTLN_torch(p=self.prob),
-            VAD_torch(p=self.prob)
+            DTLN(p=self.prob),
+            VAD(p=self.prob)
         )
 
         self.aug_transforms_no_preproc = torch.nn.Sequential(

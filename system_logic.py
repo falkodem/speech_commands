@@ -36,7 +36,7 @@ class WakeUpModelRun:
         return ((x - x.mean()) / x.std()).view(1, 1, -1)
 
     @staticmethod
-    def save_file(self, x):
+    def save_file(x):
         torchaudio.backend.soundfile_backend.save('test.wav', torch.FloatTensor(x).reshape(1, -1),
                                                   SAMPLING_RATE)
 

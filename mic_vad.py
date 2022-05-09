@@ -6,6 +6,7 @@ import tflite_runtime.interpreter as tflite
 import torchaudio.backend.soundfile_backend
 from utils.vad_functions import init_jit_model
 from utils.utils import *
+from utils.preprocessing import VAD, DTLN, MFCC
 from system_logic import WakeUpModelRun
 
 
@@ -31,109 +32,56 @@ parser.add_argument('--latency', type=float, help='latency in seconds', default=
 args = parser.parse_args(remaining)
 
 
-
-
-#   ------set some parameters ------
-# blocks in ms, fs in Hz
-block_len_ms = 32
-block_shift_ms = 8
-num_parts = block_len_ms//block_shift_ms
-# create the interpreters
-interpreter_1 = tflite.Interpreter(model_path=DTLN_1_PATH)
-interpreter_1.allocate_tensors()
-interpreter_2 = tflite.Interpreter(model_path=DTLN_2_PATH)
-interpreter_2.allocate_tensors()
-# Get input and output tensors.
-input_details_1 = interpreter_1.get_input_details()
-output_details_1 = interpreter_1.get_output_details()
-input_details_2 = interpreter_2.get_input_details()
-output_details_2 = interpreter_2.get_output_details()
-# create states for the lstms
-states_1 = np.zeros(input_details_1[1]['shape']).astype('float32')
-states_2 = np.zeros(input_details_2[1]['shape']).astype('float32')
-# calculate block shift for noise suppression model
-block_shift = int(np.round(SAMPLING_RATE * (block_shift_ms / 1000)))
-# number of points in block
-block_len = int(np.round(SAMPLING_RATE * (block_len_ms / 1000)))
 # create buffer both for vad and noise suppression models
-in_buffer = np.zeros(block_len).astype('float32')
-out_buffer = np.zeros(block_len).astype('float32')
+in_buffer = np.zeros(BLOCK_LEN).astype('float32')
+out_buffer = np.zeros(BLOCK_LEN).astype('float32')
 
+
+# load DTLN model
+dtln_realtime = DTLN(p=1)
 # load vad model
 vad_model = init_jit_model(VAD_MODEL_PATH)
 # load system activation model
 run_wake_up = WakeUpModelRun(time_folder='08052022_00-19', best_epoch=20)
+# load command detection model
+run_detector = DetectorModelRun(time_folder='', best_epoch=20)
 
 audio_is_processed = False
-thrsh = THRESHOLD
-num_of_parts = block_len_ms//block_shift_ms
 current_part = 0
 denoised_speech = []
 denoised_audio = out_buffer.copy()
-# i=0
+system_activated = False
 
 def callback(indata, frames, time, status):
     # buffer and states to global
-    global in_buffer, out_buffer, states_1, states_2
-    global denoised_speech, denoised_audio, audio_is_processed, current_part, i
+    global dtln_realtime, in_buffer, out_buffer, system_activated
+    global denoised_speech, denoised_audio, audio_is_processed, current_part
 
     if status:
         print(status)
 
-    # ---------------DTLN--------------
-    # write to buffer
-    in_buffer[:-block_shift] = in_buffer[block_shift:]
-    in_buffer[-block_shift:] = np.squeeze(indata)
-    # calculate fft of input block
-    in_block_fft = np.fft.rfft(in_buffer)
-    in_mag = np.abs(in_block_fft)
-    in_phase = np.angle(in_block_fft)
-    # reshape magnitude to input dimensions
-    in_mag = np.reshape(in_mag, (1, 1, -1)).astype('float32')
-    # set tensors to the first model
-    interpreter_1.set_tensor(input_details_1[1]['index'], states_1)
-    interpreter_1.set_tensor(input_details_1[0]['index'], in_mag)
-    # run calculation
-    interpreter_1.invoke()
-    # get the output of the first block
-    out_mask = interpreter_1.get_tensor(output_details_1[0]['index'])
-    states_1 = interpreter_1.get_tensor(output_details_1[1]['index'])
-    # calculate the ifft
-    estimated_complex = in_mag * out_mask * np.exp(1j * in_phase)
-    estimated_block = np.fft.irfft(estimated_complex)
-    # reshape the time domain block
-    estimated_block = np.reshape(estimated_block, (1, 1, -1)).astype('float32')
-    # set tensors to the second block
-    interpreter_2.set_tensor(input_details_2[1]['index'], states_2)
-    interpreter_2.set_tensor(input_details_2[0]['index'], estimated_block)
-    # run calculation
-    interpreter_2.invoke()
-    # get output tensors
-    out_block = interpreter_2.get_tensor(output_details_2[0]['index'])
-    states_2 = interpreter_2.get_tensor(output_details_2[1]['index'])
-    # write to buffer
-    out_buffer[:-block_shift] = out_buffer[block_shift:]
-    out_buffer[-block_shift:] = np.zeros(block_shift)
-    out_buffer[-block_len:] = out_buffer[-block_len:] + np.squeeze(out_block)
+    # DTLN
+    in_buffer, out_buffer = dtln_realtime.forward_realtime(indata, in_buffer, out_buffer)
+    denoised_audio[:-BLOCK_SHIFT] = denoised_audio[BLOCK_SHIFT:]
+    denoised_audio[-BLOCK_SHIFT:] = np.zeros(BLOCK_SHIFT)
+    denoised_audio[-BLOCK_SHIFT:] = out_buffer[:BLOCK_SHIFT]
 
-    denoised_audio[:-block_shift] = denoised_audio[block_shift:]
-    denoised_audio[-block_shift:] = np.zeros(block_shift)
-    denoised_audio[-block_shift:] = out_buffer[:block_shift]
-
-    # ---------------VAD---------------
-    if current_part == num_of_parts-1:
+    # VAD
+    if current_part == NUM_OF_PARTS-1:
         current_part = -1
         vad_indata_tnsr = torch.FloatTensor(denoised_audio).squeeze()
-        speech_prob = vad_model(vad_indata_tnsr, SAMPLING_RATE).item()
-        # i+=1
-        if speech_prob > thrsh:
+        if vad_model(vad_indata_tnsr, SAMPLING_RATE).item() > VAD_THRESHOLD:
             audio_is_processed = True
             denoised_speech.extend(denoised_audio)
         elif audio_is_processed == True:
             audio_is_processed = False
-            if run_wake_up(denoised_speech) > WAKE_UP_THRSH:
-                system_activated = True
-                print('JOPA')
+            if len(denoised_audio) > 150:
+                if not system_activated:
+                    if run_wake_up(denoised_speech) > WAKE_UP_THRSH:
+                        system_activated = True
+                else:
+                    command = run_detector(denoised_audio)
+                    expert_system(command)
             denoised_speech = []
 
     current_part+=1
@@ -141,8 +89,8 @@ def callback(indata, frames, time, status):
 
 try:
     with sd.InputStream(device=args.input_device,
-                   samplerate=SAMPLING_RATE, blocksize=block_shift,
-                   dtype=np.float32, latency=0.7,
+                   samplerate=SAMPLING_RATE, blocksize=BLOCK_SHIFT,
+                   dtype=np.float32, latency=LATENCY,
                    channels=1, callback=callback):
 
         print('#' * 80)
