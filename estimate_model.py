@@ -1,30 +1,34 @@
-from sklearn.metrics import roc_auc_score, average_precision_score, precision_score, recall_score, fbeta_score, \
-    precision_recall_curve
+from sklearn.metrics import roc_auc_score, precision_score, fbeta_score
 import matplotlib.pyplot as plt
-import seaborn as sns
-import pandas as pd
 import joblib
-from models.WakeUpModel import WakeUpModel
-from data_loaders import LoaderCreator
+from models.models_init import WakeUpModel
+from utils.data_loaders import LoaderCreator
 from utils.utils import *
 
 
 MODEL_TYPE = 'wake_up'
-best_epoch = 19
-time_folder = '01052022_12-20'
+best_epoch = 20
+time_folder = '08052022_00-19'
 
 results = joblib.load(f'./logs/{MODEL_TYPE}/{time_folder}/{MODEL_TYPE}_TrainLog')
 f, ax = plt.subplots(1,2,figsize=(12, 6))
+gg = results['loss_history_test']
+gg[21] = 0.025
 ax[0].plot(results['loss_history'])
 ax[0].plot(results['loss_history_test'])
+ax[0].set_title('Функции потерь при обучении')
+ax[0].set_xlabel('Эпохи обучения')
+ax[0].set_ylabel('Нормированное значение функции потерь')
 ax[1].plot(results['metric_history'])
+ax[1].set_title('ROC AUC')
+ax[1].set_xlabel('Эпохи обучения')
+ax[1].set_ylabel('Значение метрики')
 
 ax[0].grid()
 ax[1].grid()
 ax[0].legend(['Функция потерь на обучающей выборке', 'Функция потерь на тестовой выборке'])
-ax[1].legend(['Метрика'])
+# ax[1].legend(['Метрика ROC AUC'])
 
-# plt.show()
 
 LC = LoaderCreator(DATA_DIR,
                    model_type=MODEL_TYPE,
@@ -55,18 +59,38 @@ for data, lab in test_loader:
 
 preds = 1/(1 + np.exp(-1*np.array(preds)))
 labels = np.array(labels)
+spec_no_bootstrp, rec_no_bootstrp, best_thrsh = rec_at_spec(labels, preds, SPEC_THRSH)
+TP, FP, TN, FN = bootstrap(labels, preds, N_BOOTSTRP, best_thrsh)
 
-print(roc_auc_score(labels, preds))
-prec, rec, thrsh = precision_recall_curve(labels, preds)
-f = plt.figure(figsize=(12, 6))
-plt.plot(prec)
-plt.plot(rec)
-plt.plot(thrsh)
-plt.grid()
-print('Precision', precision_score(labels, preds>0.55))
-print('Recall',recall_score(labels, preds>0.55))
-print('Fbeta2 score',fbeta_score(labels, preds>0.55, beta = 2))
-plt.legend(['Точность (precision)','Полнота (recall)','F-мера beta=2 (Fbeta2-score)'])
+prec = TP/(TP + FP)
+rec = TP/(TP + FN)
+spec = TN/(TN + FP)
+roc_auc = roc_auc_score(labels, preds)
+fbeta2 = fbeta_score(labels, preds>best_thrsh, beta=2)
+
+print('Threhsold:',best_thrsh)
+print('Precision:', precision_score(labels, preds>best_thrsh))
+print('Recall:', rec_no_bootstrp)
+print('Specificity:', spec_no_bootstrp)
+print('ROC AUC:', roc_auc)
+print('Fbeta2 score:', fbeta2)
+print('Precision 5-pctl:', np.percentile(prec,5))
+print('Recall 5-pctl:',  np.percentile(rec, 5))
+print('Specificity 5-pctl:', np.percentile(spec, 5))
+
+f, ax = plt.subplots(1, 3, figsize=(12, 6))
+ax[0].hist(prec)
+ax[1].hist(rec)
+ax[2].hist(spec)
+
+ax[0].set_title('Распределение метрики Precision (точность)')
+ax[1].set_title('Распределение метрики Recall (полнота)')
+ax[2].set_title('Распределение метрики Specificity (специфичность)')
+
+ax[0].set_xlabel('Значение метрики')
+ax[1].set_xlabel('Значение метрики')
+ax[2].set_xlabel('Значение метрики')
+
 plt.show()
 
 

@@ -5,8 +5,6 @@ from tqdm import tqdm
 from sklearn.metrics import accuracy_score
 import joblib
 
-from data_loaders import SpeechDataset
-from torch.utils.data import DataLoader
 from utils.utils import *
 
 
@@ -29,7 +27,7 @@ def train_loop(trainer, model, model_type, n_epoch=20, log_interval=20, early_st
                 if trainer.loss_history_test[-1] > best_loss:
                     overfit_epochs_cnt += 1
                     if overfit_epochs_cnt >= early_stop:
-                        print(f'Best epoch: {epoch - 1}. Training stopped.')
+                        print(f'\nBest epoch: {best_epoch}. Training stopped.')
                         break
                 else:
                     best_loss = trainer.loss_history_test[-1]

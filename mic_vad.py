@@ -6,6 +6,7 @@ import tflite_runtime.interpreter as tflite
 import torchaudio.backend.soundfile_backend
 from utils.vad_functions import init_jit_model
 from utils.utils import *
+from system_logic import WakeUpModelRun
 
 
 parser = argparse.ArgumentParser(add_help=False)
@@ -60,24 +61,21 @@ out_buffer = np.zeros(block_len).astype('float32')
 
 # load vad model
 vad_model = init_jit_model(VAD_MODEL_PATH)
-
-def do_smth(audio_proc):
-    a = torch.FloatTensor(audio_proc).reshape(1, -1)
-    torchaudio.backend.soundfile_backend.save('test.wav', a, SAMPLING_RATE)
-
+# load system activation model
+run_wake_up = WakeUpModelRun(time_folder='08052022_00-19', best_epoch=20)
 
 audio_is_processed = False
-thrsh = 0.1
+thrsh = THRESHOLD
 num_of_parts = block_len_ms//block_shift_ms
 current_part = 0
 denoised_speech = []
 denoised_audio = out_buffer.copy()
-i=0
+# i=0
 
 def callback(indata, frames, time, status):
     # buffer and states to global
     global in_buffer, out_buffer, states_1, states_2
-    global denoised_speech,denoised_audio, audio_is_processed, current_part,i
+    global denoised_speech, denoised_audio, audio_is_processed, current_part, i
 
     if status:
         print(status)
@@ -123,19 +121,19 @@ def callback(indata, frames, time, status):
     denoised_audio[-block_shift:] = out_buffer[:block_shift]
 
     # ---------------VAD---------------
-    # Добавить экспоненциальное сглаживание вероятности речи, чтобы резко не обрывалось и не было провалов
     if current_part == num_of_parts-1:
         current_part = -1
         vad_indata_tnsr = torch.FloatTensor(denoised_audio).squeeze()
         speech_prob = vad_model(vad_indata_tnsr, SAMPLING_RATE).item()
-        print(speech_prob)
-        i+=1
+        # i+=1
         if speech_prob > thrsh:
             audio_is_processed = True
             denoised_speech.extend(denoised_audio)
         elif audio_is_processed == True:
             audio_is_processed = False
-            do_smth(denoised_speech)
+            if run_wake_up(denoised_speech) > WAKE_UP_THRSH:
+                system_activated = True
+                print('JOPA')
             denoised_speech = []
 
     current_part+=1
@@ -144,7 +142,7 @@ def callback(indata, frames, time, status):
 try:
     with sd.InputStream(device=args.input_device,
                    samplerate=SAMPLING_RATE, blocksize=block_shift,
-                   dtype=np.float32, latency=0.5,
+                   dtype=np.float32, latency=0.7,
                    channels=1, callback=callback):
 
         print('#' * 80)

@@ -4,7 +4,7 @@ import os
 from tqdm import tqdm
 import torchaudio
 
-from data_loaders import LoaderCreator
+from utils.data_loaders import LoaderCreator
 from utils.utils import *
 
 aug_loader = LoaderCreator.augmentation_loader(path=DATA_DIR, prob=0.25)

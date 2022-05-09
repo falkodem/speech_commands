@@ -1,14 +1,14 @@
 import torch.optim as optim
-from sklearn.metrics import roc_auc_score, average_precision_score, accuracy_score
+from sklearn.metrics import accuracy_score
 
 from utils.utils import *
 from train_tools.trainer import Trainer, train_loop
-from data_loaders import LoaderCreator
-from models.WakeUpModel import WakeUpModel
+from utils.data_loaders import LoaderCreator
+from models.models_init import EfficientNet
 
-MODEL_TYPE = 'wake_up'
+MODEL_TYPE = 'detector'
 
-criterion = torch.nn.BCELoss()
+criterion = torch.nn.CrossEntropyLoss()
 from_disc = False
 if from_disc:
     path = DATA_DIR_AUGMENTED
@@ -29,13 +29,14 @@ LC = LoaderCreator(path,
 
 train_loader, val_loader, test_loader = LC.get_loaders()
 
-model = WakeUpModel(n_channel=N_CHANNEL_WAKE_UP)
+# model = DetectorModel(n_channel=N_CHANNEL_WAKE_UP)
+model = Efficient_Net
 model.to(device)
 trainer = Trainer(criterion=criterion,
                   optimizer=optim.Adam(model.parameters(), lr=3.0e-4),
                   train_set=train_loader,
                   test_set=test_loader,
-                  metric=roc_auc_score,
+                  metric=accuracy_score,
                   device=device,
                   model_type=MODEL_TYPE)
 
