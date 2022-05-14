@@ -30,7 +30,7 @@ LC = LoaderCreator(path,
 train_loader, val_loader, test_loader = LC.get_loaders()
 
 # model = DetectorModel(n_channel=N_CHANNEL_WAKE_UP)
-model = Efficient_Net
+model = EfficientNet()
 model.to(device)
 trainer = Trainer(criterion=criterion,
                   optimizer=optim.Adam(model.parameters(), lr=3.0e-4),

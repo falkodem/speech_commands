@@ -176,7 +176,7 @@ class LoaderCreator:
         if self.model_type == 'detector':
             self.label_encoder = LabelEncoder()
             self.labels = self.label_encoder.fit_transform([pth.parent.name for pth in self.files])
-            with open('../data/label_encoder.pkl', 'wb') as le_dump_file:
+            with open('data/label_encoder.pkl', 'wb') as le_dump_file:
                 pickle.dump(self.label_encoder, le_dump_file)
         elif self.model_type == 'wake_up':
             self.labels = [1 if pth.parent.name == self.wake_up_word else 0 for pth in self.files]

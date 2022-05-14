@@ -14,7 +14,7 @@ def train_loop(trainer, model, model_type, n_epoch=20, log_interval=20, early_st
 
     overfit_epochs_cnt = 0
     with tqdm(total=n_epoch) as pbar:
-        for epoch in range(0, n_epoch ):
+        for epoch in range(0, n_epoch):
             trainer.train_epoch(model, epoch, log_interval, pbar)
             trainer.test_epoch(model, epoch, pbar)
 

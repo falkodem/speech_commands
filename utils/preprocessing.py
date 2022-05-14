@@ -22,7 +22,7 @@ class VAD(torch.nn.Module):
         speech_timestamps = get_speech_timestamps(x,
                                                   self.vad_model,
                                                   sampling_rate=SAMPLING_RATE,
-                                                  threshold=THRESHOLD)
+                                                  threshold=VAD_THRESHOLD)
         # check if speech_timestamps is empty, i.e. VAD did not detected any speech
         if len(speech_timestamps) != 0:
             return collect_chunks(speech_timestamps, x)
