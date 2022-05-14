@@ -1,4 +1,5 @@
 import numpy as np
+import pickle
 import sounddevice as sd
 import argparse
 import torch
@@ -7,7 +8,10 @@ import torchaudio.backend.soundfile_backend
 from utils.vad_functions import init_jit_model
 from utils.utils import *
 from utils.preprocessing import VAD, DTLN, MFCC
-from system_logic import WakeUpModelRun, DetectorModelRun
+from system_logic import WakeUpModelRun, DetectorModelRun, ExpertSystem
+
+with open('data/label_encoder.pkl', 'rb') as f:
+    le = pickle.load(f)
 # from gui import MyApp
 
 parser = argparse.ArgumentParser(add_help=False)
@@ -44,17 +48,14 @@ vad_model = init_jit_model(VAD_MODEL_PATH)
 run_wake_up = WakeUpModelRun(time_folder='08052022_00-19', best_epoch=20)
 # load command detection model
 run_detector = DetectorModelRun(time_folder='10052022_02-05', best_epoch=20)
+# init exper system
+expert_system = ExpertSystem()
 
 audio_is_processed = False
 current_part = 0
 denoised_speech = []
-denoised_audio = out_buffer.copy()
-system_activated = False
-
-import pickle
-
-with open('data/label_encoder.pkl', 'rb') as f:
-    le = pickle.load(f)
+denoised_audio = np.zeros(BLOCK_LEN_VAD).astype('float32')
+system_activated = expert_system.on
 
 
 def callback(indata, frames, time, status):
@@ -67,10 +68,6 @@ def callback(indata, frames, time, status):
 
     # DTLN
     in_buffer, out_buffer = dtln_realtime.forward_realtime(indata, in_buffer, out_buffer)
-    print(BLOCK_LEN, BLOCK_LEN_MS)
-    print(BLOCK_SHIFT, BLOCK_SHIFT_MS)
-    print(len(denoised_audio))
-    print('--------------')
     denoised_audio[:-BLOCK_SHIFT] = denoised_audio[BLOCK_SHIFT:]
     denoised_audio[-BLOCK_SHIFT:] = np.zeros(BLOCK_SHIFT)
     denoised_audio[-BLOCK_SHIFT:] = out_buffer[:BLOCK_SHIFT]
@@ -80,28 +77,22 @@ def callback(indata, frames, time, status):
         current_part = -1
         vad_indata_tnsr = torch.FloatTensor(denoised_audio).squeeze()
         if vad_model(vad_indata_tnsr, SAMPLING_RATE).item() > VAD_THRESHOLD:
-            raise ValueError
             audio_is_processed = True
             denoised_speech.extend(denoised_audio)
         elif audio_is_processed == True:
             audio_is_processed = False
             if len(denoised_audio) > 150:
-                if not system_activated:
+                if not expert_system.on:
                     pred = run_wake_up(denoised_speech)
                     print(pred)
                     run_wake_up.save_file(denoised_speech)
                     if pred > WAKE_UP_THRSH:
-                        print('Jopa')
-                        system_activated = True
+                        print('Система активирована')
+                        expert_system.on = True
                 else:
-                    print('-----','\nBiba')
-                    command = run_detector(denoised_speech)
+                    commands = run_detector(denoised_speech)
                     run_detector.save_file(denoised_speech)
-                    b = le.inverse_transform([np.argmax(command)])
-                    print(b)
-                    print(np.round(command,3))
-
-                    # expert_system(command)
+                    expert_system(commands[0])
             denoised_speech = []
 
     current_part+=1

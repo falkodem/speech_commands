@@ -20,10 +20,12 @@ NUM_CEPS = 32
 # Infer VAD and DTLN params
 BLOCK_LEN_MS = 32  # block len in ms
 BLOCK_SHIFT_MS = 8  # block shift in ms
+BLOCK_LEN_MS_VAD = 128
 BLOCK_SHIFT = int(np.round(SAMPLING_RATE * (BLOCK_SHIFT_MS / 1000)))
 # number of points in block
 BLOCK_LEN = int(np.round(SAMPLING_RATE * (BLOCK_LEN_MS / 1000)))
-NUM_OF_PARTS = BLOCK_LEN_MS//BLOCK_SHIFT_MS
+NUM_OF_PARTS = BLOCK_LEN_MS_VAD//BLOCK_SHIFT_MS
+BLOCK_LEN_VAD = int(np.round(SAMPLING_RATE * (BLOCK_LEN_MS_VAD / 1000)))
 VAD_THRESHOLD = 0.1  # VAD classification threshold
 LATENCY = 0.7
 
@@ -48,6 +50,10 @@ WAKE_UP_THRSH = 0.567
 DATA_DIR = Path('data/commands/')
 DATA_DIR_AUGMENTED = Path('data/augmented')
 SAVE_MODEL_DIR = 'models/files/'
+
+# Expert system
+CMD_ACCEPT_THRSH = 0.4
+
 
 def int_or_str(text):
     """Helper function for argument parsing."""
