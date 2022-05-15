@@ -39,7 +39,7 @@ class WakeUpModelRun:
 
     @staticmethod
     def save_file(x):
-        torchaudio.backend.soundfile_backend.save('test_wakeup.wav', torch.FloatTensor(x).reshape(1, -1),
+        torchaudio.backend.soundfile_backend.save('../test_wakeup.wav', torch.FloatTensor(x).reshape(1, -1),
                                                   SAMPLING_RATE)
 
 
@@ -76,7 +76,7 @@ class DetectorModelRun:
 
     @staticmethod
     def save_file(x):
-        torchaudio.backend.soundfile_backend.save('test_detector.wav', torch.FloatTensor(x).reshape(1, -1),
+        torchaudio.backend.soundfile_backend.save('../test_detector.wav', torch.FloatTensor(x).reshape(1, -1),
                                                   SAMPLING_RATE)
 
 
@@ -94,6 +94,8 @@ class ExpertSystem:
         self.lvl_1_cmd_pool_idx = self.le.transform(self.lvl_1_cmd_pool)
         self.lvl_1_cmd = None
 
+        self.chassis_cmd_pool = ['yes', 'no', 'cancel', 'correct']
+        self.chassis_cmd_pool_idx = self.le.transform(self.chassis_cmd_pool)
         self.mode_cmd_pool = ['autopilot', 'manual', 'cancel']
         self.mode_cmd_pool_idx = self.le.transform(self.mode_cmd_pool)
         self.information_cmd_pool = ['coordinates', 'fuel', 'height', 'speed', 'temperature', 'cancel']
@@ -104,7 +106,7 @@ class ExpertSystem:
         self.notebook_cmd_pool_idx = self.le.transform(self.notebook_cmd_pool)
         self.lvl_2_cmd = None
 
-        self.get_input_cmd_pool = ['0', '1', '2','3', '4', '5','6', '7', '8','9','cancel','correct']
+        self.get_input_cmd_pool = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'cancel', 'correct', 'yes', 'no']
         self.get_input_cmd_pool_idx = self.le.transform(self.get_input_cmd_pool)
 
         self.system_states = {'coordinates': 100,
@@ -112,6 +114,8 @@ class ExpertSystem:
                               'height': 6000,
                               'speed': 300,
                               'temperature': 20}
+        self.system_devices = {'chassis': False}
+
         self.input_states = []
 
     def __call__(self, indata):
@@ -151,13 +155,22 @@ class ExpertSystem:
                 self.lvl_2_func = self._notebook
                 # в файл вывода аппендится "блокнот" - kivy выводит "Начать запись?" хотя ????
             elif chosen_cmd == 'chassis_on':
-                # в файл вывода аппендится "шасси выпущены" - kivy переводит индикатор шасси в ON
-                print('Шасси выпущены')
-                self.turn_off()
+                if self.system_devices['chassis']:
+                    self.request_lvl = 1
+                    print('Шасси уже выпущены')
+                else:
+                    print('Вы уверены, что хотите выпустить шасси?')
+                    self.request_lvl = 2
+                    self.lvl_2_func = self._chassis
             elif chosen_cmd == 'chassis_off':
                 # в файл вывода аппендится "шасси убраны" - kivy переводит индикатор шасси в OFF
-                print('Шасси убраны')
-                self.turn_off()
+                if not self.system_devices['chassis']:
+                    self.request_lvl = 1
+                    print('Шасси уже убраны')
+                else:
+                    self.request_lvl = 2
+                    print('Вы уверены, что хотите убрать шасси?')
+                    self.lvl_2_func = self._chassis
             else:
                 self.turn_off()
 
@@ -170,6 +183,36 @@ class ExpertSystem:
     def _lvl_3_proc(self, indata):
         self.lvl_3_func(indata)
 
+    def _chassis(self, indata):
+        pool_idx = self.chassis_cmd_pool_idx
+        indata_lvl_2 = [indata[i] for i in pool_idx]
+        if np.max(indata_lvl_2) < CMD_ACCEPT_THRSH:
+            # в файл вывода аппендится "команда не распознана" - kivy подает сигнал и пишет "команда не распознана"
+            print('Команда режима не распознанана. Повторите ввод')
+        else:
+            chosen_cmd_idx = pool_idx[np.argmax(indata_lvl_2)]
+            chosen_cmd = self.le.inverse_transform([chosen_cmd_idx])
+            if self.system_devices['chassis']:
+                if (chosen_cmd == 'yes') | (chosen_cmd == 'correct'):
+                    self.request_lvl = 1
+                    print('Шасси убраны')
+                    self.system_devices['chassis'] = False
+                    self.turn_off()
+                    # в файл вывода аппендится "шасси убраны" - kivy переводит индикатор шасси в OFF
+                elif (chosen_cmd == 'no') | (chosen_cmd == 'cancel'):
+                    self.request_lvl = 1
+                    print('Отмена операции. Ввод первой команды')
+            else:
+                if (chosen_cmd == 'yes') | (chosen_cmd == 'correct'):
+                    self.request_lvl = 1
+                    print('Шасси выпущены')
+                    self.system_devices['chassis'] = True
+                    self.turn_off()
+                    # в файл вывода аппендится "шасси выпущены" - kivy переводит индикатор шасси в ON
+                elif (chosen_cmd == 'no') | (chosen_cmd == 'cancel'):
+                    self.request_lvl = 1
+                    print('Отмена операции. Ввод первой команды')
+
     def _mode(self,indata):
         pool_idx = self.mode_cmd_pool_idx
         indata_lvl_2 = [indata[i] for i in pool_idx]
@@ -180,12 +223,12 @@ class ExpertSystem:
             chosen_cmd_idx = pool_idx[np.argmax(indata_lvl_2)]
             chosen_cmd = self.le.inverse_transform([chosen_cmd_idx])
             if chosen_cmd == 'autopilot':
-                self.request_lvl = 3
+                self.request_lvl = 1
                 print('Автопилот')
                 self.turn_off()
                 # в файл вывода аппендится "автопилот" - kivy переводит индикатор автопилота в ON
             elif chosen_cmd == 'manual':
-                self.request_lvl = 3
+                self.request_lvl = 1
                 print('Ручное управление')
                 self.turn_off()
                 # в файл вывода аппендится "информация" - kivy переводит индикатор автопилота в OFF
@@ -305,6 +348,7 @@ class ExpertSystem:
                 # возвращение на предыдущий шаг
                 # в файл вывода аппендится "Ввод первой команды" - kivy подает сигнал отмена и выводит "Ввод первой команды"
                 self.request_lvl = 2
+                self.input_states = []
                 print('Отмена операции. Выберите параметр, который должен быть изменен')
                 # ???
             elif chosen_cmd == 'correct':
@@ -317,10 +361,14 @@ class ExpertSystem:
 
 
     def turn_on(self):
-        print('Система активирована')
+        print('------------------------')
+        print('| Система активирована |')
+        print('------------------------')
         self.on = True
 
     def turn_off(self):
-        print('Система переведена в спящий режим')
+        print('-------------------------------------')
+        print('| Система переведена в спящий режим |')
+        print('-------------------------------------')
         self.request_lvl = 1
         self.on = False

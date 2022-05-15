@@ -1,14 +1,10 @@
-import numpy as np
 import pickle
 import sounddevice as sd
 import argparse
-import torch
-import tflite_runtime.interpreter as tflite
-import torchaudio.backend.soundfile_backend
 from utils.vad_functions import init_jit_model
 from utils.utils import *
-from utils.preprocessing import VAD, DTLN, MFCC
-from system_logic import WakeUpModelRun, DetectorModelRun, ExpertSystem
+from utils.preprocessing import DTLN
+from utils.system_logic import WakeUpModelRun, DetectorModelRun, ExpertSystem
 
 with open('data/label_encoder.pkl', 'rb') as f:
     le = pickle.load(f)
@@ -87,14 +83,12 @@ def callback(indata, frames, time, status):
                     print(pred)
                     run_wake_up.save_file(denoised_speech)
                     if pred > WAKE_UP_THRSH:
-                        print('Система активирована')
-                        expert_system.on = True
+                        expert_system.turn_on()
                 else:
                     commands = run_detector(denoised_speech)
                     run_detector.save_file(denoised_speech)
                     expert_system(commands[0])
             denoised_speech = []
-
     current_part+=1
 
 
@@ -108,6 +102,7 @@ try:
         print('press Return to quit')
         print('#' * 80)
         input()
+
 except KeyboardInterrupt:
     parser.exit('')
 except Exception as e:
