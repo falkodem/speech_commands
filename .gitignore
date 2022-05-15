@@ -1,6 +1,10 @@
 .idea/
 venv/
-data/
-logs/
+data/augmented
+data/commands
+data/noise
+data/snakers4_silero-vad_master
+data/temp
+data/commands.rar
+data/noise.rar
 *.wav
-*.pkl
