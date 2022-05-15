@@ -35,7 +35,7 @@ def train_loop(trainer, model, model_type, n_epoch=20, log_interval=20, early_st
                     best_epoch = epoch
                     best_states = model.state_dict()
                     overfit_epochs_cnt = 0
-                    torch.save(model.state_dict(),
+                    torch.save(model.state_dict().cpu(),
                                f'{SAVE_MODEL_DIR}{model_type}/{now}/{model_type}_epoch_{str(epoch)}.pt')
 
             print('Epoch: {:1}\tTrain_loss {:7}\tTest_loss: {:7}\tMetric: {:3}\tBest_epoch: {:1}'

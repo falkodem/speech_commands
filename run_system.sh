@@ -1,7 +1,4 @@
 #!/bin/bash
 
-python run_back.py
+python -u run_back.py & python run_gui.py && fg
 
-echo 'running in parallel'
-wait
-echo 'done'
