@@ -23,7 +23,7 @@ class WakeUpModelRun:
         self.model.eval()
 
         self.extract_feats = torch.nn.Sequential(
-            MFCC(fs=SAMPLING_RATE, num_ceps=NUM_CEPS, normalize=True, only_mel=False),
+            MFCC(fs=SAMPLING_RATE, num_ceps=NUM_CEPS, normalize=True, only_mel=True),
             transforms.Resize((SIZE_Y, SIZE_X))
         )
 
@@ -60,7 +60,7 @@ class DetectorModelRun:
         self.model.eval()
 
         self.extract_feats = torch.nn.Sequential(
-            MFCC(fs=SAMPLING_RATE, num_ceps=NUM_CEPS, normalize=True, only_mel=False),
+            MFCC(fs=SAMPLING_RATE, num_ceps=NUM_CEPS, normalize=True, only_mel=True),
             transforms.Resize((SIZE_Y, SIZE_X))
         )
 

@@ -41,10 +41,10 @@ dtln_realtime = DTLN(p=1)
 # load vad model
 vad_model = init_jit_model(VAD_MODEL_PATH)
 # load system activation model
-run_wake_up = WakeUpModelRun(time_folder='08052022_00-19', best_epoch=20)
+run_wake_up = WakeUpModelRun(time_folder='25052022_19-08', best_epoch=14)
 # load command detection model
-run_detector = DetectorModelRun(time_folder='10052022_02-05', best_epoch=20)
-# init exper system
+run_detector = DetectorModelRun(time_folder='24052022_20-05', best_epoch=25)
+# init expert system
 expert_system = ExpertSystem()
 
 audio_is_processed = False

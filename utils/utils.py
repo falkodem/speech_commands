@@ -13,8 +13,6 @@ BACKGROUND_NOISE_PATH = 'data/noise/'
 SAMPLING_RATE = 16000
 SIZE_X = 128
 SIZE_Y = 32
-# SIZE_X = 224
-# SIZE_Y = 224
 NUM_CEPS = 32
 
 # Infer VAD and DTLN params
@@ -45,7 +43,7 @@ NOISE_MAX_SNR = 15
 DATA_MODES = ['train', 'val', 'test']
 N_BOOTSTRP = 10000
 SPEC_THRSH = 0.995
-WAKE_UP_THRSH = 0.567
+WAKE_UP_THRSH = 0.67
 
 
 DATA_DIR = Path('data/commands/')
