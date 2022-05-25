@@ -30,7 +30,7 @@ VAD_THRESHOLD = 0.1  # VAD classification threshold
 LATENCY = 0.7
 
 # Training params
-BATCH_SIZE = 128
+BATCH_SIZE = 196
 N_CHANNEL_WAKE_UP = 8
 N_EPOCH = 60
 LOG_INTERVAL = 20
@@ -44,7 +44,7 @@ NOISE_MAX_SNR = 15
 # other
 DATA_MODES = ['train', 'val', 'test']
 N_BOOTSTRP = 10000
-SPEC_THRSH = 0.999
+SPEC_THRSH = 0.995
 WAKE_UP_THRSH = 0.567
 
 

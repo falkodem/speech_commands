@@ -10,13 +10,14 @@ from utils.data_loaders import LoaderCreator
 from utils.utils import *
 
 # wake_up or detector
-MODEL_TYPE = 'wake_up'
-best_epoch = 3
-# best_epoch = 25
+MODEL_TYPE = 'detector'
+best_epoch = 25
+# best_epoch = 14
 if MODEL_TYPE == 'wake_up':
     # time_folder = '08052022_00-19'
     # новая
-    time_folder = '25052022_01-49'
+    # time_folder = '23052022_23-37'
+    time_folder = '25052022_19-08'
 else:
     # time_folder = '10052022_02-05'
     # новая
@@ -91,7 +92,7 @@ if MODEL_TYPE == 'wake_up':
     rec = TP/(TP + FN)
     spec = TN/(TN + FP)
     roc_auc = roc_auc_score(labels, preds)
-    fbeta2 = fbeta_score(labels, preds>best_thrsh, beta=2)
+    fbeta2 = fbeta_score(labels, preds>best_thrsh, beta=0.5)
 
     print('Threhsold:',best_thrsh)
     print('Precision:', precision_score(labels, preds>best_thrsh))
@@ -131,7 +132,7 @@ else:
     sns.heatmap(conf_matrix, annot=True, cmap='gray_r')
     print("Precision:", precision_score(labels, preds1, average='macro'))
     print("Recall:", precision_score(labels, preds1, average='macro'))
-    print('Fbeta2 score:', fbeta_score(labels, preds1, beta=2, average='macro'))
+    print('Fbeta2 score:', fbeta_score(labels, preds1, beta=0.5, average='macro'))
     print('Matthew corrcoef:', matthews_corrcoef(labels, preds1))
     print('ROC AUC:', roc_auc_score(labels, preds2, average='macro', multi_class='ovr'))
 

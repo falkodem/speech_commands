@@ -40,7 +40,7 @@ LC = LoaderCreator(path,
 train_loader, val_loader, test_loader = LC.get_loaders()
 
 trainer = Trainer(criterion=criterion,
-                  optimizer=optim.Adam(model.parameters(), lr=3.0e-4),
+                  optimizer=optim.Adam(model.parameters(), lr=1.0e-4),
                   train_set=train_loader,
                   test_set=val_loader,
                   metric=metric,
