@@ -10,17 +10,22 @@ from utils.data_loaders import LoaderCreator
 from utils.utils import *
 
 # wake_up or detector
-MODEL_TYPE = 'detector'
-best_epoch = 20
+MODEL_TYPE = 'wake_up'
+best_epoch = 3
+# best_epoch = 25
 if MODEL_TYPE == 'wake_up':
-    time_folder = '08052022_00-19'
+    # time_folder = '08052022_00-19'
+    # новая
+    time_folder = '25052022_01-49'
 else:
-    time_folder = '10052022_02-05'
+    # time_folder = '10052022_02-05'
+    # новая
+    time_folder = '24052022_20-05'
+
 
 results = joblib.load(f'./logs/{MODEL_TYPE}/{time_folder}/{MODEL_TYPE}_TrainLog')
 f, ax = plt.subplots(1,2,figsize=(12, 6))
 gg = results['loss_history_test']
-gg[21] = 0.025
 ax[0].plot(results['loss_history'])
 ax[0].plot(results['loss_history_test'])
 ax[0].set_title('Функции потерь при обучении')
@@ -33,17 +38,26 @@ ax[1].set_ylabel('Значение метрики')
 
 ax[0].grid()
 ax[1].grid()
-ax[0].legend(['Функция потерь на обучающей выборке', 'Функция потерь на тестовой выборке'])
+ax[0].legend(['Функция потерь на обучающей выборке', 'Функция потерь на валидационной выборке'])
 # ax[1].legend(['Метрика ROC AUC'])
 
 
+# LC = LoaderCreator(DATA_DIR,
+#                    model_type=MODEL_TYPE,
+#                    validation=False,
+#                    test_size=TEST_SIZE,
+#                    batch_size=BATCH_SIZE,
+#                    prob=PROB,
+#                    from_disc=True,
+#                    seed=SEED)
 LC = LoaderCreator(DATA_DIR,
                    model_type=MODEL_TYPE,
-                   validation=False,
+                   validation=True,
+                   val_size=VAL_SIZE,
                    test_size=TEST_SIZE,
                    batch_size=BATCH_SIZE,
                    prob=PROB,
-                   from_disc=True,
+                   from_disc=False,
                    seed=SEED)
 
 train_loader, _, test_loader = LC.get_loaders()

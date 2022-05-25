@@ -7,6 +7,77 @@ class WakeUpModel(nn.Module):
         super(WakeUpModel, self).__init__()
         self.conv1 = nn.Conv2d(1, n_channel, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
         self.bn1 = nn.BatchNorm2d(n_channel)
+        self.act1 = nn.ReLU()
+        self.pool1 = nn.MaxPool2d((2, 2), 2)
+
+        self.conv2 = nn.Conv2d(n_channel, 4 * n_channel, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+        self.bn2 = nn.BatchNorm2d(4 * n_channel)
+        self.act2 = nn.ReLU()
+        self.pool2 = nn.MaxPool2d((2, 2), 2)
+
+        self.conv3 = nn.Conv2d(4 * n_channel, 16 * n_channel, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+        self.bn3 = nn.BatchNorm2d(16 * n_channel)
+        self.act3 = nn.ReLU()
+        self.pool3 = nn.MaxPool2d((2, 2), 2)
+
+        self.conv4 = nn.Conv2d(16 * n_channel, 32 * n_channel,  kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+        self.bn4 = nn.BatchNorm2d(32 * n_channel)
+        self.act4 = nn.ReLU()
+        self.pool4 = nn.MaxPool2d((2, 2), 2)
+
+        self.conv5 = nn.Conv2d(32 * n_channel, 64 * n_channel,  kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+        self.bn5 = nn.BatchNorm2d(64 * n_channel)
+        self.act5 = nn.ReLU()
+        self.pool5 = nn.MaxPool2d(2)
+
+        self.fc1 = nn.Linear(1 * 4 * 64 * n_channel, 1)
+        self.sig = nn.Sigmoid()
+
+    def forward(self, x):
+        x = self.conv1(x)
+        x = self.bn1(x)
+        x = self.act1(x)
+        # x = self.conv1b(x)
+        # x = self.bn1b(x)
+        # x = self.act1b(x)
+        x = self.pool1(x)
+
+        x = self.conv2(x)
+        x = self.bn2(x)
+        x = self.act2(x)
+        # x = self.conv2b(x)
+        # x = self.bn2b(x)
+        # x = self.act2b(x)
+        x = self.pool2(x)
+
+        x = self.conv3(x)
+        x = self.bn3(x)
+        x = self.act3(x)
+        # x = self.conv3b(x)
+        # x = self.bn3b(x)
+        # x = self.act3b(x)
+        x = self.pool3(x)
+
+        x = self.conv4(x)
+        x = self.bn4(x)
+        x = self.act4(x)
+        x = self.pool4(x)
+
+        x = self.conv5(x)
+        x = self.bn5(x)
+        x = self.act5(x)
+        x = self.pool5(x)
+
+        x = x.view(x.size(0), x.size(1) * x.size(2) * x.size(3))
+        x = self.fc1(x)
+        x = self.sig(x)
+        return x
+
+class WakeUpModel2(nn.Module):
+    def __init__(self, n_channel=4):
+        super(WakeUpModel2, self).__init__()
+        self.conv1 = nn.Conv2d(1, n_channel, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+        self.bn1 = nn.BatchNorm2d(n_channel)
         self.act1 = nn.Tanh()
         self.pool1 = nn.MaxPool2d((2, 2), 2)
         self.conv2 = nn.Conv2d(n_channel, 2 * n_channel, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))

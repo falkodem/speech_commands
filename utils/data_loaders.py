@@ -45,11 +45,16 @@ class SpeechDataset(Dataset):
 
         # обработка теста и валидации
         self.transform = torch.nn.Sequential(
+            AddBackgroundNoise(BACKGROUND_NOISE_PATH, min_snr_in_db=-5, max_snr_in_db=NOISE_MAX_SNR,
+                               p=self.prob, sample_rate=SAMPLING_RATE),
+            AddColoredNoise(min_snr_in_db=-5, max_snr_in_db=NOISE_MAX_SNR,
+                            p=self.prob, sample_rate=SAMPLING_RATE),
             DTLN(p=1),
             VAD(p=1, mode='test'),
             # sound_transforms.MFCC(sample_rate=SAMPLING_RATE, n_mfcc=N_MFCC),
-            MFCC(fs=SAMPLING_RATE, num_ceps=NUM_CEPS, normalize=True, only_mel=False),
-            transforms.Resize((SIZE_Y, SIZE_X))  # ИЛИ ПЭДДИНГ???
+            MFCC(fs=SAMPLING_RATE, num_ceps=NUM_CEPS, normalize=True, only_mel=True),
+            transforms.Resize((SIZE_Y, SIZE_X)),
+            # ИЛИ ПЭДДИНГ???
         )
         # обработка трейна
         self.aug_transforms = torch.nn.Sequential(
@@ -61,7 +66,7 @@ class SpeechDataset(Dataset):
             VAD(p=self.prob),
             # sound_transforms.Spectrogram(n_fft=200),
             # sound_transforms.MFCC(sample_rate=SAMPLING_RATE, n_mfcc=N_MFCC),
-            MFCC(fs=SAMPLING_RATE, num_ceps=NUM_CEPS, normalize=True, only_mel=False),
+            MFCC(fs=SAMPLING_RATE, num_ceps=NUM_CEPS, normalize=True, only_mel=True),
             transforms.Resize((SIZE_Y, SIZE_X)),  # ИЛИ ПЭДДИНГ???
             sound_transforms.FrequencyMasking(freq_mask_param=3),
             sound_transforms.TimeMasking(16),
@@ -94,7 +99,7 @@ class SpeechDataset(Dataset):
 
         self.aug_transforms_no_preproc = torch.nn.Sequential(
             # sound_transforms.Spectrogram(n_fft=100,normalized=False),
-            MFCC(fs=SAMPLING_RATE, num_ceps=NUM_CEPS, normalize=True, only_mel=False),
+            MFCC(fs=SAMPLING_RATE, num_ceps=NUM_CEPS, normalize=True, only_mel=True),
             # sound_transforms.MFCC(sample_rate=SAMPLING_RATE, n_mfcc=N_MFCC),
             transforms.Resize((SIZE_Y, SIZE_X)),  # ИЛИ ПЭДДИНГ???
         )
