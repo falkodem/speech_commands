@@ -10,18 +10,19 @@ from utils.data_loaders import LoaderCreator
 from utils.utils import *
 
 # wake_up or detector
-MODEL_TYPE = 'detector'
-best_epoch = 25
-# best_epoch = 14
+MODEL_TYPE = 'wake_up'
+
 if MODEL_TYPE == 'wake_up':
     # time_folder = '08052022_00-19'
     # новая
     # time_folder = '23052022_23-37'
     time_folder = '25052022_19-08'
+    best_epoch = 14
 else:
     # time_folder = '10052022_02-05'
     # новая
     time_folder = '24052022_20-05'
+    best_epoch = 25
 
 
 results = joblib.load(f'./logs/{MODEL_TYPE}/{time_folder}/{MODEL_TYPE}_TrainLog')
@@ -87,7 +88,6 @@ labels = np.array(labels)
 if MODEL_TYPE == 'wake_up':
     spec_no_bootstrp, rec_no_bootstrp, best_thrsh = rec_at_spec(labels, preds, SPEC_THRSH)
     TP, FP, TN, FN = bootstrap(labels, preds, N_BOOTSTRP, best_thrsh)
-
     prec = TP/(TP + FP)
     rec = TP/(TP + FN)
     spec = TN/(TN + FP)
@@ -105,9 +105,13 @@ if MODEL_TYPE == 'wake_up':
     print('Specificity 5-pctl:', np.percentile(spec, 5))
 
     f, ax = plt.subplots(1, 3, figsize=(12, 6))
-    ax[0].hist(prec)
-    ax[1].hist(rec)
-    ax[2].hist(spec)
+    ax[0].hist(prec, bins=20)
+    ax[1].hist(rec, bins=20)
+    ax[2].hist(spec, bins=20)
+
+    ax[0].grid()
+    ax[1].grid()
+    ax[2].grid()
 
     ax[0].set_title('Распределение метрики Precision (точность)')
     ax[1].set_title('Распределение метрики Recall (полнота)')

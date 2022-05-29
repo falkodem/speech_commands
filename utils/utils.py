@@ -79,13 +79,17 @@ def bootstrap(labels, preds, n_bootstrps, thrsh):
     TN = []
     FN = []
     sample_size = len(labels)
+    indexes_pool = [i for i in range(sample_size)]
+    preds = np.array(preds)
+    labels = np.array(labels)
     for iter_bootstrp in range(n_bootstrps):
-        idxs = np.random.choice(sample_size)
+        idxs = np.random.choice(indexes_pool, sample_size)
         preds_sample = preds[idxs]
-        labels_sample = labels[idxs].astype('bool')
-        TP.append(np.sum(labels_sample == (preds_sample >= thrsh)))
-        FP.append(np.sum(~labels_sample == (preds_sample >= thrsh)))
-        TN.append(np.sum(~labels_sample == (preds_sample < thrsh)))
-        FN.append(np.sum(labels_sample == (preds_sample < thrsh)))
+        labels_sample = labels[idxs]
+
+        TP.append(np.sum((labels_sample == 1) & (preds_sample >= thrsh)))
+        FP.append(np.sum((labels_sample == 0) & (preds_sample >= thrsh)))
+        TN.append(np.sum((labels_sample == 0) & (preds_sample < thrsh)))
+        FN.append(np.sum((labels_sample == 1) & (preds_sample < thrsh)))
 
     return np.array(TP), np.array(FP), np.array(TN), np.array(FN)
